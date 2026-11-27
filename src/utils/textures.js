@@ -45,7 +45,7 @@ export function createSnowflakeTexture(size = 96) {
   return tex;
 }
 
-// Elongated Silky Mountain & Woodland Mist Ribbon Texture (horizontal feathery wisps, NEVER round white blobs!)
+// Elongated Silky Mountain & Woodland Mist Ribbon Texture (clearly visible drifting veil, NEVER round white blobs!)
 export function createWispyMistRibbonTexture(width = 256, height = 128) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -54,11 +54,11 @@ export function createWispyMistRibbonTexture(width = 256, height = 128) {
   ctx.clearRect(0, 0, width, height);
 
   const wisps = [
-    { x: 0.5, y: 0.54, rx: 0.44, ry: 0.24, a: 0.26 },
-    { x: 0.34, y: 0.48, rx: 0.3, ry: 0.18, a: 0.2 },
-    { x: 0.68, y: 0.56, rx: 0.28, ry: 0.16, a: 0.19 },
-    { x: 0.46, y: 0.42, rx: 0.26, ry: 0.13, a: 0.15 },
-    { x: 0.6, y: 0.62, rx: 0.22, ry: 0.12, a: 0.14 }
+    { x: 0.5, y: 0.54, rx: 0.45, ry: 0.25, a: 0.62 },
+    { x: 0.30, y: 0.48, rx: 0.30, ry: 0.18, a: 0.48 },
+    { x: 0.70, y: 0.57, rx: 0.29, ry: 0.17, a: 0.46 },
+    { x: 0.44, y: 0.42, rx: 0.26, ry: 0.14, a: 0.38 },
+    { x: 0.60, y: 0.63, rx: 0.24, ry: 0.13, a: 0.36 }
   ];
 
   for (const w of wisps) {
@@ -67,10 +67,10 @@ export function createWispyMistRibbonTexture(width = 256, height = 128) {
     ctx.scale(1, w.ry / w.rx);
     const rad = width * w.rx;
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
-    g.addColorStop(0.0, `rgba(225, 238, 252, ${w.a})`);
-    g.addColorStop(0.48, `rgba(195, 218, 244, ${w.a * 0.46})`);
-    g.addColorStop(0.82, `rgba(170, 200, 235, ${w.a * 0.12})`);
-    g.addColorStop(1.0, 'rgba(170, 200, 235, 0)');
+    g.addColorStop(0.0, `rgba(242, 248, 255, ${w.a})`);
+    g.addColorStop(0.42, `rgba(218, 234, 252, ${w.a * 0.56})`);
+    g.addColorStop(0.76, `rgba(188, 214, 242, ${w.a * 0.18})`);
+    g.addColorStop(1.0, 'rgba(188, 214, 242, 0)');
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(0, 0, rad, 0, Math.PI * 2);

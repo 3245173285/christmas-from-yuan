@@ -210,11 +210,11 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
 export class FjordWater {
   constructor(scene, perf = {}) {
     const width = 460;
-    const depth = 380;
+    const depth = 420;
     const centerX = 0;
-    const centerZ = -145;
+    const centerZ = -132;
 
-    const segs = perf.isMobile ? 64 : 96;
+    const segs = perf.isMobile ? 76 : 112;
     const geo = new THREE.PlaneGeometry(width, depth, segs, segs);
     geo.rotateX(-Math.PI / 2);
 

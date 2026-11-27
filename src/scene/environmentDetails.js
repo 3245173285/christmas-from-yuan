@@ -1074,27 +1074,37 @@ export class EnvironmentDetails {
   }
 
   buildValleyMist() {
-    // Patchy, Artfully Scattered Nordic Mist Ribbons (localized wisps tucked in mountain saddles, pine woodland edges & lakeshore coves!)
-    // Deliberately leaves center vista & distant mountain peaks crisp — NEVER muddy or clumped together!
+    // Visible, Dreamy Patchy Nordic Mist Ribbons across 3 Depth Layers:
+    // 1. Far mountain saddles & foothills (clear gap at center hero peak & aurora!)
+    // 2. Midground village & forest belts (north, east, west & south woods)
+    // 3. Near woodland edges, fjord lake & enchanted southern woodland pond!
     const mistTex = createWispyMistRibbonTexture(256, 128);
     this.mistSprites = [];
     const mistSpecs = [
-      // Left & right mountain flank valley ribbons (clear gap in center for aurora & peaks!)
-      { x: -195, y: 26, z: -275, sx: 235, sy: 44, speed: 0.95, opMult: 0.34 },
-      { x: 188, y: 28, z: -290, sx: 245, sy: 46, speed: -0.88, opMult: 0.34 },
-      { x: -125, y: 15, z: -205, sx: 165, sy: 28, speed: 0.72, opMult: 0.30 },
-      { x: 132, y: 16, z: -212, sx: 170, sy: 30, speed: -0.68, opMult: 0.30 },
-      // Patchy lakeside low-lying winter vapor wisps (here and there along shore coves)
-      { x: -64, y: 3.4, z: -96, sx: 108, sy: 15, speed: 0.58, opMult: 0.26 },
-      { x: 58, y: 3.6, z: -108, sx: 112, sy: 16, speed: -0.52, opMult: 0.26 },
-      { x: -12, y: 2.8, z: -144, sx: 96, sy: 13, speed: 0.44, opMult: 0.22 },
-      // Localized woodland-floor mist pockets drifting gently along left & right forest margins
-      { x: -56, y: 3.8, z: -24, sx: 78, sy: 13, speed: 0.42, opMult: 0.24 },
-      { x: 64, y: 4.0, z: -32, sx: 82, sy: 14, speed: -0.38, opMult: 0.24 },
-      { x: -48, y: 3.5, z: 34, sx: 72, sy: 12, speed: 0.35, opMult: 0.20 },
-      { x: 54, y: 3.8, z: 42, sx: 76, sy: 12, speed: -0.34, opMult: 0.20 },
-      { x: -84, y: 6.2, z: -148, sx: 120, sy: 20, speed: 0.50, opMult: 0.26 },
-      { x: 88, y: 6.5, z: -152, sx: 124, sy: 20, speed: -0.48, opMult: 0.26 }
+      // Far mountain flanks & valleys (visible atmospheric separation between foothills & alpine ridges!)
+      { x: -195, y: 27, z: -270, sx: 255, sy: 48, speed: 0.95, opMult: 0.62 },
+      { x: 185, y: 30, z: -285, sx: 265, sy: 50, speed: -0.88, opMult: 0.62 },
+      { x: -115, y: 17, z: -195, sx: 185, sy: 34, speed: 0.72, opMult: 0.56 },
+      { x: 122, y: 18, z: -202, sx: 190, sy: 36, speed: -0.68, opMult: 0.56 },
+      { x: -24, y: 15, z: -225, sx: 170, sy: 28, speed: 0.54, opMult: 0.44 },
+      // Far southern mountain foothills & forest belt (visible when orbiting behind the tree!)
+      { x: -92, y: 16, z: 165, sx: 185, sy: 34, speed: 0.64, opMult: 0.54 },
+      { x: 96, y: 18, z: 172, sx: 190, sy: 36, speed: -0.60, opMult: 0.54 },
+      { x: 6, y: 13, z: 138, sx: 165, sy: 28, speed: 0.48, opMult: 0.48 },
+      // Midground woodland edges behind coastal village
+      { x: -82, y: 7.5, z: -146, sx: 132, sy: 22, speed: 0.52, opMult: 0.50 },
+      { x: 86, y: 7.8, z: -150, sx: 136, sy: 22, speed: -0.50, opMult: 0.50 },
+      // Patchy glacial lake low-lying winter vapor wisps
+      { x: -64, y: 3.4, z: -96, sx: 112, sy: 17, speed: 0.58, opMult: 0.44 },
+      { x: 58, y: 3.6, z: -108, sx: 116, sy: 18, speed: -0.52, opMult: 0.44 },
+      // Near woodland-floor drifting mist pockets (curling between left, right & southern spruce trunks!)
+      { x: -54, y: 4.0, z: -20, sx: 84, sy: 16, speed: 0.42, opMult: 0.46 },
+      { x: 60, y: 4.2, z: -28, sx: 88, sy: 16, speed: -0.38, opMult: 0.46 },
+      { x: -46, y: 3.8, z: 36, sx: 82, sy: 15, speed: 0.36, opMult: 0.44 },
+      { x: 56, y: 4.0, z: 44, sx: 86, sy: 15, speed: -0.34, opMult: 0.44 },
+      { x: -16, y: 4.2, z: 74, sx: 96, sy: 18, speed: 0.40, opMult: 0.46 },
+      // Delicate mist wisp drifting just above the enchanted southern woodland pond!
+      { x: 24, y: 1.6, z: 32, sx: 44, sy: 8.5, speed: 0.30, opMult: 0.42 }
     ];
 
     for (let i = 0; i < mistSpecs.length; i++) {
@@ -1276,11 +1286,13 @@ export class EnvironmentDetails {
 
     this.snowMat.uniforms.uColor.value.copy(dayState.cloudTint).lerp(new THREE.Color('#ffffff'), 0.72);
 
+    const mistTint = new THREE.Color().copy(dayState.skyHorizon).lerp(dayState.cloudTint, 0.45);
+    const moonlitSilver = new THREE.Color('#a8c8e6');
+    mistTint.lerp(moonlitSilver, 0.38 + dayState.starIntensity * 0.16);
     for (const m of this.mistSprites) {
-      m.sprite.position.x = m.baseX + Math.sin(elapsedTime * 0.036 * m.speed + m.phase) * 32.0;
-      m.mat.opacity = dayState.mistOpacity * m.opMult;
-      // Keep night mist deeply tinted to midnight-indigo atmospheric fog (never milky white blobs!)
-      m.mat.color.copy(dayState.fogColor).lerp(dayState.skyHorizon, 0.42);
+      m.sprite.position.x = m.baseX + Math.sin(elapsedTime * 0.042 * m.speed + m.phase) * 26.0;
+      m.mat.opacity = Math.min(0.46, Math.max(0.14, dayState.mistOpacity * m.opMult));
+      m.mat.color.copy(mistTint);
     }
 
     this.flockCycle = (this.flockCycle + dt * 0.025) % 1.0;

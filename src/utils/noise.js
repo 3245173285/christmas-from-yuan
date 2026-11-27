@@ -170,8 +170,18 @@ export function getLakeMask(x, z) {
   return 1.0 - smoothstep(0.56, 1.08, combined);
 }
 
+// Sculpted Enchanted Southern Woodland Pond mask [0..1] (replaces shallow murky dip with a deep shimmering Nordic pond!)
+export function getWoodlandPondMask(x, z) {
+  const warpX = x + fbm2D(x * 0.032 + 4.1, z * 0.032 - 2.7, 2) * 5.2;
+  const warpZ = z + fbm2D(x * 0.032 - 1.9, z * 0.032 + 5.3, 2) * 4.4;
+  const dx = (warpX - 24.0) / 18.5;
+  const dz = (warpZ - 32.0) / 13.5;
+  const d = Math.hypot(dx, dz);
+  return 1.0 - smoothstep(0.54, 1.04, d);
+}
+
 // Master procedural terrain elevation at world (x, z)
-// Wide open meadow plain -> serene glacial lake -> terraced coastal village foothills -> detailed eroded snow mountain range
+// Wide open meadow plain -> serene glacial lake + deep woodland pond -> terraced coastal village foothills -> detailed eroded snow mountain range
 export function getTerrainHeight(x, z) {
   const r = Math.hypot(x, z);
 
@@ -183,14 +193,22 @@ export function getTerrainHeight(x, z) {
   const treeClear = smoothstep(4.5, 18.0, r);
   let h = (broadRoll + mediumRoll + microRoll) * treeClear;
 
+  // Keep non-lake southern meadow dry & snowy (prevents accidental shallow muddy smudges!)
+  const southDryLift = smoothstep(4.0, 22.0, z) * smoothstep(0.0, 1.4, (WATER_LEVEL + 0.85) - h) * 1.15;
+  h += southDryLift;
+
   // Gentle outer plain undulation far from center
   const softOuterHills = smoothstep(105, 240, r) * (0.5 + 0.5 * fbm2D(x * 0.0055, z * 0.0055, 3)) * 13.0;
   h += softOuterHills;
 
-  // 2. Smoothly carve the glacial lake basin
+  // 2. Smoothly carve the glacial fjord lake basin + deep enchanted woodland pond
   const lakeMask = getLakeMask(x, z);
+  const pondMask = getWoodlandPondMask(x, z);
+  const combinedWaterMask = Math.max(lakeMask, pondMask);
   const lakeFloor = WATER_LEVEL - 3.6 + fbm2D(x * 0.03, z * 0.03, 2) * 0.65;
+  const pondFloor = WATER_LEVEL - 2.8 + fbm2D(x * 0.05, z * 0.05, 2) * 0.35;
   h = lerp(h, lakeFloor, lakeMask);
+  h = lerp(h, pondFloor, pondMask);
 
   // Subtle trail depression
   const pathF = getPathFactor(x, z);
@@ -216,7 +234,7 @@ export function getTerrainHeight(x, z) {
   const surroundRange = massifShape * 66.0 * distMountainRing * (1.0 - northRangeMask * 0.72);
 
   // Smooth protection so mountains never create abrupt vertical walls next to the water
-  const waterProtect = 1.0 - smoothstep(0.02, 0.94, lakeMask);
+  const waterProtect = 1.0 - smoothstep(0.02, 0.94, combinedWaterMask);
   h += (foothillRamp + heroAlpine + surroundRange) * waterProtect;
 
   // 4. Gently terrace earthen pads for our clustered lakeside village buildings
