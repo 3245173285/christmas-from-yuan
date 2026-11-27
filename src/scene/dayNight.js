@@ -7,7 +7,7 @@ const KEYFRAMES = [
   {
     hour: 0.0,
     phase: 'Aurora Night',
-    phaseZh: '������ҹ',
+    phaseZh: '\u6781\u5149\u5348\u591c',
     skyZenith: new THREE.Color('#040814'),
     skyMid: new THREE.Color('#081428'),
     skyHorizon: new THREE.Color('#10233d'),
@@ -33,7 +33,7 @@ const KEYFRAMES = [
   {
     hour: 4.5,
     phase: 'Deep Night',
-    phaseZh: '������ҹ',
+    phaseZh: '\u9759\u8c27\u6df1\u591c',
     skyZenith: new THREE.Color('#050918'),
     skyMid: new THREE.Color('#0b1730'),
     skyHorizon: new THREE.Color('#172947'),
@@ -59,7 +59,7 @@ const KEYFRAMES = [
   {
     hour: 6.5,
     phase: 'Nordic Dawn',
-    phaseZh: '��������',
+    phaseZh: '\u62c2\u6653\u8584\u96fe',
     skyZenith: new THREE.Color('#272b56'),
     skyMid: new THREE.Color('#7a557c'),
     skyHorizon: new THREE.Color('#e89ba0'),
@@ -85,7 +85,7 @@ const KEYFRAMES = [
   {
     hour: 9.0,
     phase: 'Golden Morning',
-    phaseZh: '�峿ů��',
+    phaseZh: '\u6e05\u6668\u6696\u9633',
     skyZenith: new THREE.Color('#245799'),
     skyMid: new THREE.Color('#6fa0cf'),
     skyHorizon: new THREE.Color('#f2d6b3'),
@@ -111,7 +111,7 @@ const KEYFRAMES = [
   {
     hour: 13.0,
     phase: 'Crisp Midday',
-    phaseZh: '�峺����',
+    phaseZh: '\u6e05\u6f88\u6b63\u5348',
     skyZenith: new THREE.Color('#1a55a8'),
     skyMid: new THREE.Color('#5a9be0'),
     skyHorizon: new THREE.Color('#cde2f5'),
@@ -137,7 +137,7 @@ const KEYFRAMES = [
   {
     hour: 16.5,
     phase: 'Golden Hour',
-    phaseZh: '�ƽ�ʱ��',
+    phaseZh: '\u9ec4\u91d1\u65f6\u523b',
     skyZenith: new THREE.Color('#21457d'),
     skyMid: new THREE.Color('#966d7e'),
     skyHorizon: new THREE.Color('#f59a56'),
@@ -163,7 +163,7 @@ const KEYFRAMES = [
   {
     hour: 18.8,
     phase: 'Blue Hour',
-    phaseZh: '����ʱ��',
+    phaseZh: '\u84dd\u8c03\u65f6\u523b',
     skyZenith: new THREE.Color('#0c1b44'),
     skyMid: new THREE.Color('#342a62'),
     skyHorizon: new THREE.Color('#cc6156'),
@@ -189,7 +189,7 @@ const KEYFRAMES = [
   {
     hour: 21.0,
     phase: 'Aurora Night',
-    phaseZh: '����ҹ��',
+    phaseZh: '\u6781\u5149\u591c\u666f',
     skyZenith: new THREE.Color('#040917'),
     skyMid: new THREE.Color('#09162e'),
     skyHorizon: new THREE.Color('#122745'),
@@ -215,7 +215,7 @@ const KEYFRAMES = [
   {
     hour: 24.0,
     phase: 'Aurora Night',
-    phaseZh: '������ҹ',
+    phaseZh: '\u6781\u5149\u5348\u591c',
     skyZenith: new THREE.Color('#040814'),
     skyMid: new THREE.Color('#081428'),
     skyHorizon: new THREE.Color('#10233d'),
@@ -376,7 +376,7 @@ export class DayNightSystem {
     this.state = {
       hour: this.timeHours,
       phase: 'Aurora Night',
-      phaseZh: '����ҹ��',
+      phaseZh: '\u6781\u5149\u591c\u666f',
       skyZenith: new THREE.Color(),
       skyMid: new THREE.Color(),
       skyHorizon: new THREE.Color(),
