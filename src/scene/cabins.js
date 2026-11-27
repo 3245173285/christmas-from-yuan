@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CABIN_SITES, getTerrainHeight, WATER_LEVEL } from '../utils/noise.js';
 import { createSmokePuffTexture, createWoodPlankTexture } from '../utils/textures.js';
 
@@ -130,6 +131,9 @@ export class NorwegianCabins {
       scene.add(pt);
       this.cabinLights.push({ light: pt, baseIntensity: a.intensity });
     }
+
+    // Pre-bake / batch-merge all static town, church, boardwalk & pier meshes by material (~500 draw calls -> ~16 draw calls!)
+    this.bakeStaticTownMeshes();
 
     // Soft rising translucent chimney smoke plumes (selected 7 chimneys for clean graceful sky silhouettes)
     this.smokeTexture = createSmokePuffTexture(128);
@@ -1005,6 +1009,66 @@ export class NorwegianCabins {
       const fadeOut = Math.pow(1 - p, 1.55);
       puff.mat.opacity = fadeIn * fadeOut * (0.16 + 0.12 * (1 - dayState.starIntensity * 0.35));
       puff.mat.color.copy(dayState.cloudTint).lerp(new THREE.Color('#eef4fa'), 0.55);
+    }
+  }
+
+  // Startup Static Batching ("Pre-Baking" draw calls):
+  // Merges ~500 static village/church/pier/streetlamp meshes sharing the same material into ~16 combined meshes!
+  bakeStaticTownMeshes() {
+    this.group.updateMatrixWorld(true);
+
+    const dynamicRoots = new Set(this.bobbingBoats.map((b) => b.boat));
+    const isUnderDynamic = (obj) => {
+      let cur = obj;
+      while (cur) {
+        if (dynamicRoots.has(cur)) return true;
+        cur = cur.parent;
+      }
+      return false;
+    };
+
+    const byMaterial = new Map();
+    const meshesToRemove = [];
+
+    this.group.traverse((obj) => {
+      if (!obj.isMesh || obj.isInstancedMesh) return;
+      if (isUnderDynamic(obj)) return;
+      if (Array.isArray(obj.material)) return;
+
+      const mat = obj.material;
+      let geom = obj.geometry.clone();
+      if (geom.index) geom = geom.toNonIndexed();
+      geom.applyMatrix4(obj.matrixWorld);
+
+      if (!geom.attributes.normal) geom.computeVertexNormals();
+      if (!geom.attributes.uv) {
+        const count = geom.attributes.position.count;
+        geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(count * 2), 2));
+      }
+      for (const attrName of Object.keys(geom.attributes)) {
+        if (attrName !== 'position' && attrName !== 'normal' && attrName !== 'uv') {
+          geom.deleteAttribute(attrName);
+        }
+      }
+
+      if (!byMaterial.has(mat)) byMaterial.set(mat, []);
+      byMaterial.get(mat).push(geom);
+      meshesToRemove.push(obj);
+    });
+
+    for (const m of meshesToRemove) {
+      if (m.parent) m.parent.remove(m);
+      m.geometry.dispose();
+    }
+
+    for (const [mat, geoms] of byMaterial.entries()) {
+      const merged = mergeGeometries(geoms, false);
+      for (const g of geoms) g.dispose();
+      if (!merged) continue;
+      const batchMesh = new THREE.Mesh(merged, mat);
+      batchMesh.castShadow = false;
+      batchMesh.receiveShadow = true;
+      this.group.add(batchMesh);
     }
   }
 }

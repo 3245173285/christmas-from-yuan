@@ -159,8 +159,9 @@ export class LuxuryChristmasTree {
     this.hoveredGiftIdx = -1;
     this.glowTex = createSoftGlowTexture(128, 'rgba(255,246,214,0.95)', 'rgba(255,204,108,0.42)');
 
+    this.perf = perf;
     this.buildTrunkAndBoughs();
-    this.buildPineNeedles(perf.needleClusterCount);
+    this.buildPineNeedles(perf.needleClusterCount, perf.needleScaleBoost || 1.0, perf.treeNeedlesCastShadow !== false);
     this.buildHelicalGoldRibbon();
     this.buildLuxuryOrnaments();
     this.buildFairyLights(perf.fairyLightCount);
@@ -247,7 +248,7 @@ export class LuxuryChristmasTree {
     this.group.add(boughInst);
   }
 
-  buildPineNeedles(targetCount) {
+  buildPineNeedles(targetCount, scaleBoost = 1.0, castShadow = true) {
     const sprigGeo = createCrossedSprigGeometry();
     const sprigTex = createPineSprigTexture(256);
 
@@ -282,7 +283,7 @@ export class LuxuryChristmasTree {
     };
 
     const instMesh = new THREE.InstancedMesh(sprigGeo, needleMat, targetCount);
-    instMesh.castShadow = true;
+    instMesh.castShadow = castShadow;
     instMesh.receiveShadow = true;
 
     const dummy = new THREE.Object3D();
@@ -321,7 +322,7 @@ export class LuxuryChristmasTree {
         const pitch = 0.95 + (1.0 - frac) * 0.35 + (this.rand() - 0.5) * 0.45;
         dummy.rotation.set(pitch, fanAngle, (this.rand() - 0.5) * 0.6, 'YXZ');
 
-        const sc = (0.72 + (1.0 - b.hNorm) * 0.65) * (0.75 + this.rand() * 0.45);
+        const sc = (0.72 + (1.0 - b.hNorm) * 0.65) * (0.75 + this.rand() * 0.45) * scaleBoost;
         dummy.scale.set(sc, sc * (0.85 + this.rand() * 0.3), sc);
         dummy.updateMatrix();
         instMesh.setMatrixAt(idx, dummy.matrix);
@@ -345,7 +346,7 @@ export class LuxuryChristmasTree {
 
       dummy.position.set(Math.sin(a) * r, y, Math.cos(a) * r);
       dummy.rotation.set(0.85 + this.rand() * 0.65, a + (this.rand() - 0.5) * 0.8, (this.rand() - 0.5) * 0.5, 'YXZ');
-      const sc = (0.58 + (1.0 - hNorm) * 0.68) * (0.75 + this.rand() * 0.4);
+      const sc = (0.58 + (1.0 - hNorm) * 0.68) * (0.75 + this.rand() * 0.4) * scaleBoost;
       dummy.scale.setScalar(sc);
       dummy.updateMatrix();
       instMesh.setMatrixAt(idx, dummy.matrix);

@@ -332,13 +332,13 @@ function createCurvedAuroraRibbon(width, height, radius, arcAngle, yOffset, zOff
 }
 
 export class SkyAndAurora {
-  constructor(scene) {
+  constructor(scene, perf = {}) {
     this.scene = scene;
     this.group = new THREE.Group();
     scene.add(this.group);
 
     // 1. Sky Dome
-    const skyGeo = new THREE.SphereGeometry(920, 48, 32);
+    const skyGeo = new THREE.SphereGeometry(920, perf.isMobile ? 32 : 48, perf.isMobile ? 20 : 32);
     this.skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -383,7 +383,8 @@ export class SkyAndAurora {
       }
     ];
 
-    for (const spec of curtainSpecs) {
+    const activeSpecs = curtainSpecs.slice(0, perf.auroraCurtainCount || 3);
+    for (const spec of activeSpecs) {
       const geo = createCurvedAuroraRibbon(spec.width, spec.height, spec.radius, spec.arc, spec.y, spec.z, spec.tilt);
       const mat = new THREE.ShaderMaterial({
         transparent: true,

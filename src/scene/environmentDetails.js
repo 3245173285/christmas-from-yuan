@@ -293,6 +293,7 @@ export class EnvironmentDetails {
     scene.add(this.group);
 
     this.rand = mulberry32(987651);
+    this.isMobile = Boolean(perf.isMobile);
     this.windTime = { value: 0 };
     this.snowCoverUniform = { value: 0.92 };
     this.snowEnabled = true;
@@ -497,7 +498,7 @@ export class EnvironmentDetails {
     }
 
     const inst = new THREE.InstancedMesh(rockGeo, rockMat, matrices.length);
-    inst.castShadow = true;
+    inst.castShadow = !this.isMobile;
     inst.receiveShadow = true;
     for (let i = 0; i < matrices.length; i++) inst.setMatrixAt(i, matrices[i]);
     inst.instanceMatrix.needsUpdate = true;
@@ -630,7 +631,8 @@ export class EnvironmentDetails {
 
     const crownInst = new THREE.InstancedMesh(crownGeo, crownMat, matrices.length);
     const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, matrices.length);
-    crownInst.castShadow = true;
+    // Distant alpha-tested spruce crowns disabled from shadow map (massive FPS gain on mobile & desktop!)
+    crownInst.castShadow = false;
     crownInst.receiveShadow = true;
 
     const c = new THREE.Color();

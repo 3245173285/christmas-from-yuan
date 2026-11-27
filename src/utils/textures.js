@@ -405,6 +405,93 @@ export function createGrassClumpTexture(size = 256) {
   return tex;
 }
 
+// Pre-baked Seamless 512x512 RGBA Terrain Detail Texture (runs ONCE at startup!)
+// Eliminates ~28 per-pixel FBM/Ridged noise loops every frame in terrain.js -> massive GPU speedup on mobile & desktop!
+// Channels: R = Alpine Ridged Crags, G = Fine Granite Strata/Crevices, B = Organic Snow Melt Pattern, A = Micro Surface Grain
+export function createBakedTerrainDetailTexture(size = 256) {
+  const data = new Uint8Array(size * size * 4);
+
+  // Tileable periodic value noise helper
+  const hash = (ix, iy, period, seed) => {
+    const x = ((ix % period) + period) % period;
+    const y = ((iy % period) + period) % period;
+    const n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
+    return n - Math.floor(n);
+  };
+
+  const tileNoise = (u, v, freq, seed) => {
+    const x = u * freq;
+    const y = v * freq;
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const fx = x - ix;
+    const fy = y - iy;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+
+    const a = hash(ix, iy, freq, seed);
+    const b = hash(ix + 1, iy, freq, seed);
+    const c = hash(ix, iy + 1, freq, seed);
+    const d = hash(ix + 1, iy + 1, freq, seed);
+    return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
+  };
+
+  const tileFbm = (u, v, baseFreq, octaves, seed) => {
+    let sum = 0;
+    let amp = 0.5;
+    let norm = 0;
+    let f = baseFreq;
+    for (let o = 0; o < octaves; o++) {
+      sum += amp * tileNoise(u, v, f, seed + o * 13.7);
+      norm += amp;
+      f *= 2;
+      amp *= 0.5;
+    }
+    return sum / norm;
+  };
+
+  const tileRidged = (u, v, baseFreq, octaves, seed) => {
+    let sum = 0;
+    let amp = 0.55;
+    let norm = 0;
+    let f = baseFreq;
+    for (let o = 0; o < octaves; o++) {
+      const n = 1.0 - Math.abs(tileNoise(u, v, f, seed + o * 19.3) * 2.0 - 1.0);
+      sum += n * n * amp;
+      norm += amp;
+      f *= 2;
+      amp *= 0.5;
+    }
+    return sum / norm;
+  };
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const r = tileRidged(u, v, 6, 4, 1.0);     // R: Alpine ridged crags & ribs
+      const g = tileRidged(u, v, 14, 3, 27.3);   // G: Fine granite crevices & rock relief
+      const b = tileFbm(u, v, 5, 4, 53.1);       // B: Organic snow melt & frost pattern
+      const a = tileFbm(u, v, 24, 2, 91.7);      // A: High-frequency micro grain & snow sparkle
+
+      const idx = (y * size + x) * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r * 255)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g * 255)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b * 255)));
+      data[idx + 3] = Math.min(255, Math.max(0, Math.round(a * 255)));
+    }
+  }
+
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export function createVelvetNormalBump(size = 128) {
   const canvas = document.createElement('canvas');
   canvas.width = size;

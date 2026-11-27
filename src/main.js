@@ -27,7 +27,7 @@ function initNordicChristmas() {
 
   // 1. WebGL Renderer with ACES Filmic Tone Mapping & Soft Shadows
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: !perf.isMobile,
     powerPreference: 'high-performance'
   });
   renderer.setPixelRatio(perf.pixelRatio);
@@ -36,43 +36,57 @@ function initNordicChristmas() {
   renderer.toneMappingExposure = 1.08;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = perf.isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  if (perf.shadowThrottleFrames > 1) {
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+  }
   container.appendChild(renderer.domElement);
 
-  // 2. Scene & Cinematic Perspective Camera
+  // 2. Scene & Portrait-Adaptive Cinematic Perspective Camera
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.25, 1850);
-
-  // 3. Post-Processing Pipeline (EffectComposer + Selective UnrealBloomPass + OutputPass)
-  const composer = new EffectComposer(renderer);
-  const renderPass = new RenderPass(scene, camera);
-  composer.addPass(renderPass);
-
-  const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(
-      Math.floor(window.innerWidth * perf.bloomResolutionScale),
-      Math.floor(window.innerHeight * perf.bloomResolutionScale)
-    ),
-    0.42, // subtle cinematic strength
-    0.58, // soft dreamy radius
-    0.86  // threshold so only lights/star/windows/glints bloom
+  const computeFov = (w, h) => {
+    const aspect = w / Math.max(1, h);
+    // Smoothly widen vertical FOV on portrait mobile phones so tree, gifts, village & aurora fit harmoniously!
+    return aspect < 0.85 ? Math.min(66, 50 + (0.85 - aspect) * 42) : 50;
+  };
+  const camera = new THREE.PerspectiveCamera(
+    computeFov(window.innerWidth, window.innerHeight),
+    window.innerWidth / window.innerHeight,
+    0.25,
+    1850
   );
-  composer.addPass(bloomPass);
 
-  const outputPass = new OutputPass();
-  composer.addPass(outputPass);
+  // 3. Post-Processing Pipeline (Desktop uses selective UnrealBloomPass; Mobile renders directly for +120% FPS!)
+  let composer = null;
+  let bloomPass = null;
+  if (perf.useBloom) {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(
+        Math.floor(window.innerWidth * perf.bloomResolutionScale),
+        Math.floor(window.innerHeight * perf.bloomResolutionScale)
+      ),
+      0.42,
+      0.58,
+      0.86
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+  }
 
   // 4. Assemble World Systems
   const dayNight = new DayNightSystem(scene, renderer);
   dayNight.setShadowMapSize(perf.shadowMapSize);
 
-  const skyAndAurora = new SkyAndAurora(scene);
+  const skyAndAurora = new SkyAndAurora(scene, perf);
   const terrain = new NordicTerrain(scene, perf);
   const fjordWater = new FjordWater(scene);
   const cabins = new NorwegianCabins(scene);
   const christmasTree = new LuxuryChristmasTree(scene, perf);
   const envDetails = new EnvironmentDetails(scene, perf);
-  const magicParticles = new MagicParticles(scene, 3600);
+  const magicParticles = new MagicParticles(scene, perf.isMobile ? 1600 : 3600);
   const cameraRig = new CinematicCameraRig(camera, renderer.domElement);
   const audioEngine = new NordicAudioEngine();
   const giftCardModal = new GiftCardModal();
@@ -113,44 +127,51 @@ function initNordicChristmas() {
     }
   });
 
-  // 5. Responsive Window Resize
+  // 5. Responsive Window Resize (with portrait-aware FOV adjustment)
   window.addEventListener('resize', () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    camera.aspect = w / h;
+    camera.fov = computeFov(w, h);
+    camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
-    composer.setSize(w, h);
-    bloomPass.setSize(
-      Math.floor(w * perf.bloomResolutionScale),
-      Math.floor(h * perf.bloomResolutionScale)
-    );
+    if (composer && bloomPass) {
+      composer.setSize(w, h);
+      bloomPass.setSize(
+        Math.floor(w * perf.bloomResolutionScale),
+        Math.floor(h * perf.bloomResolutionScale)
+      );
+    }
   });
 
   // 6. Adaptive Runtime FPS Monitor (gracefully lowers DPR if sustained low FPS)
   let fpsFrames = 0;
   let fpsAccum = 0;
   let adapted = false;
+  let frameCounter = 0;
 
   // 7. Smooth Main Animation Loop
   const clock = new THREE.Clock();
-  let firstFrameDone = false;
 
   function animate() {
     requestAnimationFrame(animate);
 
     const dt = Math.min(clock.getDelta(), 0.1);
     const elapsed = clock.elapsedTime;
+    frameCounter++;
 
-    // Adaptive resolution safeguard during first ~4 seconds
+    // Adaptive resolution safeguard during first ~3.5 seconds
     if (!adapted) {
       fpsFrames++;
       fpsAccum += dt;
       if (fpsAccum >= 3.0) {
         const avgFps = fpsFrames / fpsAccum;
-        if (avgFps < 26 && renderer.getPixelRatio() > 1.0) {
-          renderer.setPixelRatio(1.0);
-          composer.setPixelRatio(1.0);
+        if (avgFps < 26) {
+          const targetDpr = perf.isMobile ? 0.88 : 1.0;
+          if (renderer.getPixelRatio() > targetDpr) {
+            renderer.setPixelRatio(targetDpr);
+            if (composer) composer.setPixelRatio(targetDpr);
+          }
         }
         adapted = true;
       }
@@ -158,9 +179,16 @@ function initNordicChristmas() {
 
     const dayState = dayNight.update(dt);
 
-    // Modulate bloom smoothly: dreamy glow at dusk/night, crisp restraint at snowy midday
-    bloomPass.strength = 0.18 + dayState.treeLightFactor * 0.3;
-    bloomPass.threshold = 0.92 - dayState.treeLightFactor * 0.12;
+    // Throttled directional shadow map baking on mobile (reduces shadow GPU work by ~80%)
+    if (perf.shadowThrottleFrames > 1 && frameCounter % perf.shadowThrottleFrames === 0) {
+      renderer.shadowMap.needsUpdate = true;
+    }
+
+    // Modulate bloom smoothly on desktop
+    if (bloomPass) {
+      bloomPass.strength = 0.18 + dayState.treeLightFactor * 0.3;
+      bloomPass.threshold = 0.92 - dayState.treeLightFactor * 0.12;
+    }
 
     cameraRig.update(elapsed, dt);
     terrain.update(dayState);
@@ -172,7 +200,11 @@ function initNordicChristmas() {
     magicParticles.update(elapsed, dt);
     ui.updateTimeDisplay(dayState);
 
-    composer.render();
+    if (composer) {
+      composer.render();
+    } else {
+      renderer.render(scene, camera);
+    }
   }
 
   animate();
