@@ -76,7 +76,9 @@ export class NordicTerrain {
       uSnowCover: { value: 0.92 },
       uWaterLevel: { value: WATER_LEVEL },
       uNightFactor: { value: 1.0 },
-      uBakedDetail: { value: bakedDetailTex }
+      uBakedDetail: { value: bakedDetailTex },
+      uAlpineMist: { value: 1 },
+      uAlpineTime: { value: 0 }
     };
 
     const mat = new THREE.MeshStandardMaterial({
@@ -223,6 +225,33 @@ export class NordicTerrain {
         `#include <roughnessmap_fragment>
          roughnessFactor = mix(roughnessFactor, 0.66, vSnowFinal * 0.82);`
       );
+
+      // Layered aerial perspective only over the mountain terrain. Low slopes
+      // lose contrast first; high summits still read through the drifting haze.
+      shader.uniforms.uAlpineMist = this.uniforms.uAlpineMist;
+      shader.uniforms.uAlpineTime = this.uniforms.uAlpineTime;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>
+        uniform float uAlpineMist;
+        uniform float uAlpineTime;`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>', `#ifdef USE_FOG
+        float alpineDistance = length(vWorldPos - cameraPosition);
+        float alpineRange = smoothstep(210.0, 525.0, length(vWorldPos.xz));
+        if (alpineRange > 0.001) {
+          vec3 alpineRay = vWorldPos - cameraPosition;
+          vec2 wind = vec2(uAlpineTime * 0.0005, -uAlpineTime * 0.00028);
+          float opticalDepth = 0.0;
+          for (int i = 0; i < 3; i++) {
+            vec3 samplePos = cameraPosition + alpineRay * (0.46 + float(i) * 0.20);
+            float bank = texture2D(uBakedDetail, samplePos.xz * 0.00145 + wind).b;
+            float cloudTop = 36.0 + bank * 34.0;
+            opticalDepth += exp(-max(0.0, samplePos.y) / cloudTop) * (0.52 + bank * 0.96);
+          }
+          float haze = 1.0 - exp(-opticalDepth * alpineDistance * 0.00079 * uAlpineMist * alpineRange);
+          vec3 airLight = mix(fogColor, vec3(.18,.25,.31), uNightFactor*.31);
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, airLight, haze);
+        }
+      #endif
+      #include <fog_fragment>`);
     };
 
     this.mesh = new THREE.Mesh(geo, mat);
@@ -231,7 +260,9 @@ export class NordicTerrain {
     scene.add(this.mesh);
   }
 
-  update(dayState) {
+  update(dayState, time = 0) {
+    this.uniforms.uAlpineTime.value = time;
+    this.uniforms.uAlpineMist.value = 0.55 + dayState.mistOpacity * 0.85;
     this.uniforms.uSnowCover.value = dayState.snowCover;
     this.uniforms.uNightFactor.value = dayState.starIntensity;
   }

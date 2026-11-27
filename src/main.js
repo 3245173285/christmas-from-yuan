@@ -96,7 +96,7 @@ function initNordicChristmas() {
   const envDetails = new EnvironmentDetails(scene, perf);
   const surface = createSurfaceSampler(perf);
   const festiveMeadow = new FestiveMeadow(scene, surface);
-  const distantLandscape = new DistantLandscape(scene, surface);
+  const distantLandscape = new DistantLandscape(scene, surface, terrain.mesh.material);
   clearOccupiedDetails(envDetails.group,
     [...festiveMeadow.clearAreas, ...distantLandscape.clearAreas], distantLandscape.clearRoutes);
   const magicParticles = new MagicParticles(scene, perf.isMobile ? 1600 : 3600);
@@ -276,7 +276,7 @@ function initNordicChristmas() {
     }
 
     cameraRig.update(elapsed, dt);
-    terrain.update(dayState);
+    terrain.update(dayState, elapsed);
     skyAndAurora.update(elapsed, dt, dayState, camera.position);
     fjordWater.update(elapsed, dayState);
     cabins.update(elapsed, dt, dayState);

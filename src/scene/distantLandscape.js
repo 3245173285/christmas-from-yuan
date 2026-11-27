@@ -1,54 +1,102 @@
 import * as THREE from 'three';
-import { fbm2D, ridged2D, smoothstep, mulberry32, WATER_LEVEL } from '../utils/noise.js';
+import { fbm2D, ridged2D, getTerrainHeight, smoothstep, mulberry32, WATER_LEVEL } from '../utils/noise.js';
+import { getSharedNoiseLUTTexture } from '../utils/textures.js';
 import { primitives as P, v3, standard, part, beam, tube, extrude, bake, instanceTemplate, matrixAt } from './detailGeometry.js';
+import { buildRockCascade, buildDetailedLighthouse, LIGHTHOUSE } from './coastalDetails.js';
 
 export const ISLAND = {x:44,z:-87,rx:11.5,rz:8.7};
-const RIVER_ROUTE = [[72,-320],[63,-301],[62,-285],[49,-268],[54,-253],[48,-240],[43,-225],[32,-210],[14,-196],[2,-185],[-4,-172]];
 const HILL_CABINS = [[-84,-177,.62,1.14],[-100,-196,-.86,1.04],[-64,-201,.26,.96]];
-const LIGHTHOUSE = [98,-108];
 
 function islandRadius(a){return 1+.07*Math.sin(a*5+.8)+.035*Math.cos(a*8-1.2);}
 function islandHeight(q,a){return WATER_LEVEL-.67+3.65*(1-smoothstep(.39,1,q))+.26*Math.sin(a*3+.4)*Math.sin(q*Math.PI);}
 function islandAt(x,z){const dx=(x-ISLAND.x)/ISLAND.rx,dz=(z-ISLAND.z)/ISLAND.rz,a=Math.atan2(dx,dz),q=Math.hypot(dx,dz)/islandRadius(a);return islandHeight(q,a);}
 
+const CAMEO_DURATION = 23;
+const CAMEO_WINDOW = 3.07;
+function flightAt(p, out) {
+  return out.set(-164+328*p, 65+10*Math.sin(p*Math.PI)+1.35*Math.sin(p*14), -226+11*Math.sin(p*2.7));
+}
+
 export class DistantLandscape {
-  constructor(scene,surface){
-    this.scene=scene;this.surface=surface;this.rand=mulberry32(10281226);this.group=new THREE.Group();this.group.name='Fjord landscape details';scene.add(this.group);
+  constructor(scene,surface,terrainMaterial){
+    this.scene=scene;this.surface=surface;// Preserve the exact island layout after removing the 106 legacy cascade random draws.
+    this.rand=mulberry32((10281226+Math.imul(106,0x6d2b79f5))>>>0);this.group=new THREE.Group();this.group.name='Fjord landscape details';scene.add(this.group);
     this.static=new THREE.Group();this.clearAreas=[];this.clearRoutes=[];
     this.snow=standard('#e4edf3');this.rock=standard('#555c62');this.wood=standard('#6f4932');this.trim=standard('#dcddd6');this.roof=standard('#3f4147',{roughness:.86});
     this.red=standard('#8f342d');this.ochre=standard('#b07a37');this.dark=standard('#403e3e');this.lit=standard('#ffcb7b',{emissive:'#ffa93d',emissiveIntensity:1.4,roughness:.33});
     this.green=standard('#294739');this.green2=standard('#3b5848');this.frostGreen=standard('#92a99e');
-    this.buildFarRanges();this.buildCascade();this.buildIsland();this.buildHillside();this.buildLighthouse();this.buildSkyCameo();
+    this.buildFarRanges(terrainMaterial);
+    this.buildMountainMist();
+    this.cascade=buildRockCascade(this.group,this.static,this.clearAreas,this.surface);
+    this.buildIsland();this.buildHillside();
+    this.lighthouse=buildDetailedLighthouse(this);
+    this.buildSkyCameo();
     this.group.add(bake(this.static,{shadow:false,receive:false}));this.static.clear();
   }
-  buildFarRanges(){
-    // Two distant eroded ridges beyond the existing terrain. Cool atmospheric haze is
-    // inherited from the live fog and sunlight; low relief to the south preserves the aurora.
-    const mats=[standard('#ffffff',{vertexColors:true,roughness:1}),standard('#ffffff',{vertexColors:true,roughness:1})];
-    for(let layer=0;layer<2;layer++){
-      const N=360,R=9,positions=[],colors=[],indices=[];
-      const base=layer?744:606,width=layer?121:136;
-      for(let row=0;row<=R;row++)for(let i=0;i<=N;i++){
-        const a=i/N*Math.PI*2,radial=row/R,na=Math.sin(a),nb=Math.cos(a);
-        const north=smoothstep(-.25,.95,-nb),v=ridged2D(na*5.1+layer*12,nb*5.1-layer*3.7,5);
-        const long=fbm2D(na*2.9+12+layer*6,nb*2.9-3.6,4)*.5+.5;
-        const ridge=(Math.sin(radial*Math.PI)**.86)*(1+.085*Math.sin(a*17+radial*3));
-        const baseH=(49+90*v+55*long+65*north)*(layer?1.09:1);
-        const r=base+radial*width+17*Math.sin(a*4.1+layer)+9*Math.cos(a*11.0+layer*3);
-        const detail=fbm2D(na*17+row*.7,nb*17+layer*5,3)*9*ridge;
-        const y=-18+ridge*baseH+detail;
-        positions.push(r*na,y,r*nb);
-        if(row<R&&i<N){let k=row*(N+1)+i;indices.push(k,k+N+1,k+1,k+1,k+N+1,k+N+2);}
+  buildFarRanges(terrainMaterial){
+    // Continuation of the exact foreground height field and rock/snow shader.
+    // The original terrain is a square, so the first ring follows its perimeter.
+    const N=480,R=27,pos=[],idx=[],colors=[],path=[],base=new THREE.Color('#1f2632');
+    for(let i=0;i<=N;i++){
+      const a=i/N*Math.PI*2, sx=Math.sin(a), sz=Math.cos(a);
+      const edge=570/Math.max(Math.abs(sx),Math.abs(sz)), north=smoothstep(-.18,.88,-sz);
+      for(let j=0;j<=R;j++){
+        const t=j/R,r=THREE.MathUtils.lerp(edge-12,862,t);
+        const x=sx*r,z=sz*r;
+        const ridge=ridged2D(x*.0094+16,z*.0094-2.3,4);
+        const relief=(ridge-.5)*(19+15*north)*smoothstep(0,.31,t);
+        const falloff=1-smoothstep(.50,1,t);
+        const natural=getTerrainHeight(x,z)+relief;
+        const y=THREE.MathUtils.lerp(-15,natural,falloff)-2.2*(1-smoothstep(0,.23,t));
+        pos.push(x,y,z);colors.push(base.r,base.g,base.b);path.push(0);
+        if(i<N&&j<R){const k=i*(R+1)+j;idx.push(k,k+1,k+R+1,k+1,k+R+2,k+R+1);}
       }
-      const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setIndex(indices);geo.computeVertexNormals();
-      const norm=geo.attributes.normal,baseRock=new THREE.Color(layer?'#526781':'#46566c'),snow=new THREE.Color(layer?'#bacdde':'#bdcfde'),c=new THREE.Color();
-      for(let i=0;i<norm.count;i++){
-        const x=positions[i*3],y=positions[i*3+1],z=positions[i*3+2],noise=fbm2D(x*.021,z*.021,3);
-        const snowMask=smoothstep(65,155,y+noise*65)*smoothstep(.05,.66,norm.getY(i));
-        c.copy(baseRock).multiplyScalar(.82+.30*(noise+.5)).lerp(snow,snowMask*.95);colors.push(c.r,c.g,c.b);
-      }
-      geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));part(this.group,geo,mats[layer]);
     }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+    geo.setAttribute('aPath',new THREE.Float32BufferAttribute(path,1));
+    geo.setIndex(idx);geo.computeVertexNormals();
+    part(this.group,geo,terrainMaterial).name='Alpine terrain continuation';
+  }
+  buildMountainMist(){
+    // A bounded, depth-tested fog volume over distant valleys only. Use the
+    // existing noise texture and five samples along each view ray.
+    const center=v3(0,48,-432),half=v3(370,48,118);
+    this.mistUniforms={
+      uCenter:{value:center},uExtent:{value:half},uTime:{value:0},uDensity:{value:.45},
+      uTint:{value:new THREE.Color('#5f7383')},uNoise:{value:getSharedNoiseLUTTexture(256)}
+    };
+    const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:this.mistUniforms,
+      vertexShader:`varying vec3 vMistWorld;
+        void main(){vec4 p=modelMatrix*vec4(position,1.0);vMistWorld=p.xyz;gl_Position=projectionMatrix*viewMatrix*p;}`,
+      fragmentShader:`varying vec3 vMistWorld;
+        uniform vec3 uCenter;uniform vec3 uExtent;uniform vec3 uTint;
+        uniform float uTime;uniform float uDensity;uniform sampler2D uNoise;
+        void main(){
+          vec3 ray=normalize(vMistWorld-cameraPosition);
+          vec3 safeRay=ray+vec3(0.00002);
+          vec3 lo=(uCenter-uExtent-cameraPosition)/safeRay;
+          vec3 hi=(uCenter+uExtent-cameraPosition)/safeRay;
+          vec3 a=min(lo,hi),b=max(lo,hi);
+          float nearT=max(0.0,max(a.x,max(a.y,a.z))),farT=min(b.x,min(b.y,b.z));
+          float span=max(0.0,farT-nearT),density=0.0;
+          for(int i=0;i<5;i++){
+            vec3 p=cameraPosition+ray*(nearT+span*((float(i)+.5)*.2));
+            vec3 unit=abs((p-uCenter)/uExtent);
+            float edge=(1.0-smoothstep(.46,1.0,unit.x))*(1.0-smoothstep(.40,1.0,unit.z));
+            vec2 uv=p.xz*vec2(.0028,.0049)+vec2(uTime*.00040,-uTime*.00017);
+            vec4 n=texture2D(uNoise,uv+vec2(p.y*.0019,p.y*.0028));
+            float top=32.0+n.g*36.0;
+            float layer=smoothstep(4.0,23.0,p.y)*(1.0-smoothstep(top-13.0,top+16.0,p.y));
+            density+=edge*layer*smoothstep(.23,.79,n.b*.72+n.r*.28);
+          }
+          float alpha=(1.0-exp(-density*span*.0019*uDensity))*.55;
+          gl_FragColor=vec4(uTint,alpha);
+        }`
+    });
+    part(this.group,new THREE.BoxGeometry(half.x*2,half.y*2,half.z*2),material,center.toArray()).name='Drifting alpine valley haze';
+    this.mistAir = new THREE.Color('#557185');
   }
   groundRibbon(route,width,offset,material,step=1.25){
     const curve=new THREE.CatmullRomCurve3(route.map(([x,z])=>v3(x,0,z)),false,'centripetal'),length=curve.getLength(),N=Math.ceil(length/step),cols=6,pos=[],uv=[],idx=[],samples=[];
@@ -63,30 +111,6 @@ export class DistantLandscape {
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(idx);geo.computeVertexNormals();
     // Both sides remove sensitivity to the orientation of the winding strip.
     material.side=THREE.DoubleSide;part(this.group,geo,material);return samples;
-  }
-  buildCascade(){
-    const bank=standard('#62707a',{roughness:.92}),water=standard('#a9d9e5',{roughness:.30,metalness:.12,emissive:'#254b60',emissiveIntensity:.16});
-    this.cascadeUniform={value:0};this.cascadeDay={value:0};this.waterMaterial=water;
-    water.onBeforeCompile=shader=>{
-      shader.uniforms.uCascadeTime=this.cascadeUniform;
-      shader.uniforms.uCascadeDay=this.cascadeDay;
-      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 vCascadeUv;').replace('#include <begin_vertex>','#include <begin_vertex>\nvCascadeUv=uv;');
-      shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec2 vCascadeUv;uniform float uCascadeTime;uniform float uCascadeDay;').replace('#include <color_fragment>',`#include <color_fragment>
-        float run=vCascadeUv.y-uCascadeTime*.87;
-        float thread=sin(vCascadeUv.x*47.0+sin(run*4.4))*sin(run*7.0+vCascadeUv.x*18.0);
-        float rapid=smoothstep(.28,.86,sin(run*7.6+sin(vCascadeUv.x*9.0))*.5+.5);
-        float foam=clamp(.26+smoothstep(.12,.83,thread*.5+.5)*.57+rapid*.24,0.0,1.0);
-        float edge=smoothstep(0.0,.10,vCascadeUv.x)*(1.0-smoothstep(.90,1.0,vCascadeUv.x));
-        diffuseColor.rgb=mix(vec3(.19,.32,.37),mix(vec3(.34,.61,.70),vec3(.86,.96,.99),foam),edge);`)
-        .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-        totalEmissiveRadiance += mix(vec3(.08,.17,.23),vec3(.23,.32,.36),uCascadeDay)*foam*edge;`);
-    };
-    this.groundRibbon(RIVER_ROUTE,4.6,.10,bank,.9);
-    const samples=this.groundRibbon(RIVER_ROUTE,3.8,.21,water,.8);this.clearRoutes.push({samples,r:3.1});
-    // Alternate banks seeded with exposed slate fragments and glacier-blue ice.
-    const stones=new THREE.Group(),stoneInstances=[];part(stones,P.rock,this.rock,[0,0,0],[1,.42,.62]);
-    for(let i=2;i<samples.length-5;i+=6){const [x,z]=samples[i],dx=(i%2?1:-1)*(2.2+this.rand()*.8),xx=x+dx,y=this.surface(xx,z);if(y<WATER_LEVEL)continue;stoneInstances.push(matrixAt(xx,y+.06,z,this.rand()*Math.PI,.65+this.rand()*.76));}
-    instanceTemplate(this.group,stones,stoneInstances,{receive:false});
   }
   buildIsland(){
     const p=[],color=[],idx=[],snowMask=[],N=84,R=16,c=new THREE.Color(),moss=new THREE.Color('#436147'),cliff=new THREE.Color('#4a535b'),sand=new THREE.Color('#7c817a');
@@ -147,22 +171,10 @@ export class DistantLandscape {
       for(let j=0;j<2;j++){const px=x+Math.cos(yaw)*(3+j*.5),pz=z+Math.sin(yaw)*3;part(this.static,P.cylinder,this.wood,[px,this.surface(px,pz)+.65,pz],[.10,1.3,.10]);part(this.static,P.box,this.lit,[px,this.surface(px,pz)+1.37,pz],[.20,.23,.20]);}
     }
   }
-  buildLighthouse(){
-    const [x,z]=LIGHTHOUSE,y=this.surface(x,z);this.clearAreas.push({x,z,r:4.2});const g=new THREE.Group();g.position.set(x,y,z);this.static.add(g);
-    part(g,P.cylinder,this.rock,[0,.2,0],[2.0,.65,2.0]);
-    const tower=new THREE.CylinderGeometry(.74,1.10,6.1,16);part(g,tower,this.trim,[0,3.25,0]);
-    part(g,new THREE.CylinderGeometry(.84,.95,1.5,16),this.red,[0,3.15,0]);
-    part(g,P.cylinder,this.iron||this.roof,[0,6.39,0],[1.19,.22,1.19]);part(g,P.cylinder,this.lit,[0,6.83,0],[.65,.76,.65]);
-    for(let i=0;i<12;i++){const a=i*Math.PI/6;part(g,P.cylinder,this.roof,[Math.sin(a)*.70,6.83,Math.cos(a)*.70],[.045,.81,.045]);part(g,P.cylinder,this.roof,[Math.sin(a)*1.04,6.78,Math.cos(a)*1.04],[.036,.70,.036]);}
-    part(g,P.ring,this.roof,[0,7.05,0],[1.05,1.05,.43],[Math.PI/2,0,0]);part(g,P.cone,this.red,[0,7.48,0],[1.02,.79,1.02]);part(g,P.sphere,this.roof,[0,7.91,0],[.11,.16,.11]);part(g,P.box,this.wood,[0,.99,1.0],[.60,1.28,.11]);
-    const lens=new THREE.Group();lens.position.set(x,y+6.82,z);this.group.add(lens);this.beacon=lens;
-    this.beaconMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,uniforms:{uPower:{value:0}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`uniform float uPower;varying vec2 vUv;void main(){float fade=(1.0-smoothstep(.10,1.0,vUv.x))*sin(vUv.y*3.14159);gl_FragColor=vec4(.88,.71,.43,fade*uPower*.12);}`});
-    const b=new THREE.BufferGeometry();b.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,34,-2.6,0,34,2.6,0,0,0,0,34,0,-2.6,34,0,2.6],3));b.setAttribute('uv',new THREE.Float32BufferAttribute([0,.5,1,0,1,1,0,.5,1,0,1,1],2));b.computeVertexNormals();part(lens,b,this.beaconMat);
-  }
   buildSkyCameo(){
     this.cameo=new THREE.Group();this.cameo.name='Midnight sleigh silhouette';this.group.add(this.cameo);
     const dark=new THREE.MeshBasicMaterial({color:'#141a28',transparent:true,opacity:0,depthWrite:false}),muted=new THREE.MeshBasicMaterial({color:'#571f28',transparent:true,opacity:0,depthWrite:false}),glint=new THREE.MeshBasicMaterial({color:'#e5b86d',transparent:true,opacity:0,depthWrite:false});this.cameoMats=[dark,muted,glint];
-    const g=new THREE.Group();
+    const g=new THREE.Group();this.cameoLegs=[];
     for(const side of [-1,1]){
       tube(g,[v3(side*.58,-.14,-1.35),v3(side*.58,-.18,-.45),v3(side*.58,-.13,1.02),v3(side*.58,.25,1.31),v3(side*.58,.39,1.12)],.066,dark,20,6);
       const wall=extrude([[-1.38,.12],[-1.44,.92],[-1.1,.96],[-.68,.51],[.68,.45],[1.04,.72],[1.13,.21]],.09,.018);wall.rotateY(-Math.PI/2);part(g,wall,muted,[side*.59,0,0]);
@@ -171,22 +183,107 @@ export class DistantLandscape {
     for(let pair=0;pair<2;pair++)for(const side of [-1,1]){
       const deer=new THREE.Group();deer.position.set(side*.69,.10,2.90+pair*2.70);g.add(deer);
       part(deer,P.sphere,dark,[0,.45,0],[.27,.30,.67]);beam(deer,v3(0,.59,.34),v3(0,.98,.66),.14,dark,.09);part(deer,P.sphere,dark,[0,1.05,.76],[.12,.16,.23]);
-      for(const s of [-1,1]){beam(deer,v3(s*.15,.34,.31),v3(s*.18,-.04,.71),.051,dark,.032);beam(deer,v3(s*.15,.32,-.38),v3(s*.20,-.05,-.77),.062,dark,.027);beam(deer,v3(s*.06,1.16,.69),v3(s*.23,1.51,.61),.033,dark,.016);beam(deer,v3(s*.15,1.33,.64),v3(s*.28,1.45,.81),.024,dark,.008);}
+      for(const s of [-1,1]){
+        beam(deer,v3(s*.06,1.16,.69),v3(s*.23,1.51,.61),.033,dark,.016);
+        beam(deer,v3(s*.15,1.33,.64),v3(s*.28,1.45,.81),.024,dark,.008);
+        for(const front of [true,false]){
+          const pivot=new THREE.Group(), upper=new THREE.Group(), dz=front?.31:-.38;
+          pivot.position.copy(deer.position).add(v3(s*.15,.34,dz));
+          beam(upper,v3(0,0,0),v3(s*.025,-.19,front?.12:-.12),front?.051:.060,dark,.033);
+          beam(upper,v3(s*.025,-.19,front?.12:-.12),v3(s*.039,-.40,front?.16:-.19),.035,dark,.024);
+          pivot.add(bake(upper,{receive:false})); this.cameo.add(pivot);
+          this.cameoLegs.push({pivot,phase:pair*.62+side*.42+s*.25+(front?0:Math.PI)});
+        }
+      }
       beam(g,v3(side*.53,.45,1.02),v3(side*.69,.45,2.9+pair*2.7),.012,dark);
       part(deer,P.sphere,glint,[0,.99,.94],[.045,.045,.045]);
     }
     this.cameo.add(bake(g,{receive:false}));
-    // Single small sparkling point stream trails the runners; bright enough to reward a careful viewer.
-    const positions=[],phases=[];for(let i=0;i<80;i++){const q=i/80;positions.push((this.rand()-.5)*(.28+q*1.2),.05-q*.9+(this.rand()-.5)*.32,-1.55-q*14);phases.push(this.rand()*6.28);}
-    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setAttribute('aPhase',new THREE.Float32BufferAttribute(phases,1));
-    this.trailMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{uTime:{value:0},uAlpha:{value:0}},vertexShader:`attribute float aPhase;uniform float uTime;varying float vF;void main(){vec3 p=position;p.x+=sin(aPhase+uTime*1.7)*.23;p.y+=sin(aPhase+uTime*1.2)*.12;vF=(1.0-clamp((-p.z-1.5)/14.0,0.0,1.0))*(.37+.63*pow(.5+.5*sin(uTime*4.5+aPhase),3.0));vec4 mv=modelViewMatrix*vec4(p,1.0);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(440.0/max(1.0,-mv.z),1.2,4.8);}`,fragmentShader:`uniform float uAlpha;varying float vF;void main(){float d=length(gl_PointCoord-.5)*2.0;gl_FragColor=vec4(1.0,.76,.33,exp(-d*d*5.0)*vF*uAlpha*.75);}`});this.cameo.add(new THREE.Points(geo,this.trailMat));this.cameo.visible=false;
+    // World-space dust persists on the route after the sled moves away.
+    const count=196, r=mulberry32(2612026);
+    this.trailPos=new Float32Array(count*3);
+    this.trailOpacity=new Float32Array(count);
+    this.trailSeeds=Array.from({length:count},(_,i)=>[(i+.5)/count,r(),r(),r()]);
+    this.trailVector=v3(0,0,0);
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(this.trailPos,3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aLife',new THREE.BufferAttribute(this.trailOpacity,1).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aSeed',new THREE.Float32BufferAttribute(this.trailSeeds.map(x=>x[3]),1));
+    this.trailMat=new THREE.ShaderMaterial({
+      transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+      uniforms:{uTime:{value:0},uPixelRatio:{value:typeof window==='undefined'?1:Math.min(window.devicePixelRatio,1.5)}},
+      vertexShader:`
+        attribute float aLife;attribute float aSeed;uniform float uTime;uniform float uPixelRatio;
+        varying float vFade;varying float vStar;
+        void main(){
+          float sparkle=pow(.5+.5*sin(uTime*(1.9+aSeed*3.1)+aSeed*59.0),8.0);
+          vStar=smoothstep(.92,.995,aSeed)*sparkle;vFade=aLife*(.35+.48*sparkle);
+          vec4 mv=modelViewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*mv;
+          gl_PointSize=clamp((360.0+aSeed*220.0+vStar*260.0)*uPixelRatio/max(1.0,-mv.z),1.0,5.8);
+        }`,
+      fragmentShader:`
+        varying float vFade;varying float vStar;
+        void main(){
+          vec2 p=gl_PointCoord-.5;float rr=dot(p,p);
+          float soft=exp(-rr*24.0)*(1.-smoothstep(.14,.25,rr));
+          float diamond=exp(-(abs(p.x)*24.0+abs(p.y)*8.0))+exp(-(abs(p.x)*8.0+abs(p.y)*24.0));
+          gl_FragColor=vec4(mix(vec3(1.,.66,.29),vec3(1.,.84,.56),vStar),vFade*(soft*.65+diamond*vStar*.22));
+        }`
+    });
+    this.trail=new THREE.Points(geo,this.trailMat);
+    this.trail.frustumCulled=false;this.group.add(this.trail);
+    this.cameo.visible=this.trail.visible=false;
+    this.cameoProgress=-1;
+    this.inCameoWindow=false;
+    this.previousHour=null;
+  }
+  updateCameo(t,dt,ds){
+    const fromMidnight=(ds.hour+24-23.75)%24;
+    const night=ds.starIntensity>.5, inWindow=night&&fromMidnight<CAMEO_WINDOW;
+    const hourJump=this.previousHour!==null&&Math.abs(((ds.hour-this.previousHour+36)%24)-12)>.24;
+    if(inWindow&&(!this.inCameoWindow||hourJump))this.cameoProgress=fromMidnight/CAMEO_WINDOW;
+    else if(!night||hourJump)this.cameoProgress=-1;
+    else if(this.cameoProgress>=0)this.cameoProgress+=dt/CAMEO_DURATION;
+    this.previousHour=ds.hour;
+    this.inCameoWindow=inWindow;
+    const p=this.cameoProgress, active=night&&p>=0;
+    this.cameo.visible=active&&p<1;
+    this.trail.visible=active&&p<1.20;
+    if(!this.trail.visible)return;
+    const f=smoothstep(0,.09,p)*(1-smoothstep(.90,1,p));
+    if(this.cameo.visible){
+      flightAt(p,this.cameo.position);
+      this.cameo.rotation.set(.016*Math.sin(p*13),Math.atan2(328,29.7*Math.cos(p*2.7)),.038*Math.sin(p*11));
+      this.cameo.scale.setScalar(1.25);
+      this.cameoMats.forEach(m=>m.opacity=f*.92);
+      for(const {pivot,phase} of this.cameoLegs)pivot.rotation.x=Math.sin(t*8+phase)*.28;
+    }
+    const tailOut=1-smoothstep(1.02,1.20,p);
+    for(let i=0;i<this.trailSeeds.length;i++){
+      const [q,a,b,c]=this.trailSeeds[i], behind=.008+q*.185, oldP=p-behind;
+      flightAt(THREE.MathUtils.clamp(oldP,0,1),this.trailVector);
+      const k=i*3, drift=q*q;
+      this.trailPos[k]=this.trailVector.x-2.0+(a-.5)*(.9+4*drift);
+      this.trailPos[k+1]=this.trailVector.y+.16+(b-.5)*(.55+6.5*drift)-2.2*drift;
+      this.trailPos[k+2]=this.trailVector.z+(c-.5)*(.9+6*drift);
+      this.trailOpacity[i]=oldP>0&&oldP<1?tailOut*(1-q)**1.2*smoothstep(0,.08,oldP):0;
+    }
+    this.trail.geometry.attributes.position.needsUpdate=true;
+    this.trail.geometry.attributes.aLife.needsUpdate=true;
+    this.trailMat.uniforms.uTime.value=t;
   }
   update(t,dt,ds){
-    this.cascadeUniform.value=t;this.cascadeDay.value=1-ds.treeLightFactor;this.waterMaterial.emissiveIntensity=.06+.12*ds.treeLightFactor;this.lit.emissiveIntensity=.025+ds.cabinLightFactor*2.15;
-    this.islandSnow.value=ds.snowCover;this.beacon.rotation.y=t*.48;this.beaconMat.uniforms.uPower.value=ds.cabinLightFactor;
-    // Time-based cameo: only around midnight, once per 24-hour loop, with a soft fade.
-    const fromMidnight=(ds.hour+24-23.75)%24,progress=fromMidnight/.90,show=progress>=0&&progress<1&&ds.starIntensity>.5;
-    this.cameo.visible=show;
-    if(show){const f=smoothstep(0,.16,progress)*(1-smoothstep(.80,1,progress));this.cameo.position.set(-161+322*progress,63+9*Math.sin(progress*Math.PI),-226);this.cameo.rotation.y=Math.PI*.5;this.cameo.rotation.z=.035*Math.sin(progress*12);this.cameo.scale.setScalar(1.25);this.cameoMats.forEach(m=>m.opacity=f*.90);this.trailMat.uniforms.uAlpha.value=f;this.trailMat.uniforms.uTime.value=t;}
+    this.mistUniforms.uTime.value=t;
+    this.mistUniforms.uDensity.value=.29+ds.mistOpacity*.58;
+    this.mistUniforms.uTint.value.copy(ds.fogColor).lerp(this.mistAir,.46*ds.starIntensity);
+    this.cascade.time.value=t;this.cascade.daylight.value=1-ds.treeLightFactor;
+    this.lit.emissiveIntensity=.025+ds.cabinLightFactor*2.15;
+    this.islandSnow.value=ds.snowCover;
+    const {lens,beaconMat,lamp,glazing}=this.lighthouse;
+    lens.rotation.y=t*LIGHTHOUSE.speed;
+    beaconMat.uniforms.uPower.value=ds.cabinLightFactor*ds.cabinLightFactor;
+    lamp.emissiveIntensity=.06+ds.cabinLightFactor*1.72;
+    glazing.emissiveIntensity=ds.cabinLightFactor*.53;
+    this.updateCameo(t,dt,ds);
   }
 }

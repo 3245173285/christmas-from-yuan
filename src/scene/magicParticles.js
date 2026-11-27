@@ -94,7 +94,7 @@ export class MagicParticles {
     this.activeSpirals = [];
     const cometTex = createSoftGlowTexture(128, 'rgba(255,252,232,1)', 'rgba(255,214,118,0.52)');
     this.cometSprites = [];
-    const cometColors = ['#ffe9a6', '#fff8e2', '#a8f8e0'];
+    const cometColors = ['#ffe0a2', '#fff1d3', '#ffdcab'];
     for (let i = 0; i < 3; i++) {
       const sm = new THREE.SpriteMaterial({
         map: cometTex,
@@ -135,15 +135,21 @@ export class MagicParticles {
     this.swirls[i] = swirl;
   }
 
+  // This channel alone is exposure-limited; gift and ornament particles stay unchanged.
+  spawnStarParticle(x,y,z,vx,vy,vz,r,g,b,size,life,gravity,drag,swirl) {
+    this.spawnParticle(x,y,z,vx,vy,vz,r*.55,g*.55,b*.55,size*.75,life,gravity,drag,swirl);
+  }
+
   // Grand Multi-Layer Starlight Symphony triggered when clicking the Tree-Top Golden Star!
   // Layer 1: Radiant expanding golden crown burst & diamond ring right at the star
   // Layer 2: 3 synchronized luminous spiral stardust streams orbiting 4.5 turns from tree top down to base
   // Layer 3: Expanding golden stardust wave blooming across the snow & gift ring at finale!
   emitStarCascade(origin) {
-    // 1. Radiant Star Crown Burst + Horizontal Expanding Star Halo Ring
-    for (let k = 0; k < 180; k++) {
-      const a = (k / 180) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
-      const isRing = k < 72;
+    if (this.activeSpirals[0]?.age < .42) return;
+    const crownCount = 108;
+    for (let k = 0; k < crownCount; k++) {
+      const a = (k / crownCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
+      const isRing = k < 38;
       const speed = isRing ? (3.2 + Math.random() * 1.4) : (1.5 + Math.random() * 4.8);
       const vy = isRing ? ((Math.random() - 0.5) * 0.65) : (0.8 + Math.random() * 4.2);
 
@@ -152,10 +158,10 @@ export class MagicParticles {
       if (roll > 0.68) {
         r = 1.0; g = 0.97; b = 0.86; // diamond white
       } else if (roll < 0.18) {
-        r = 0.52; g = 0.98; b = 0.84; // aurora emerald accent
+        r = 1.0; g = 0.84; b = 0.62; // champagne accent
       }
 
-      this.spawnParticle(
+      this.spawnStarParticle(
         origin.x + (Math.random() - 0.5) * 0.35,
         origin.y + (Math.random() - 0.5) * 0.35,
         origin.z + (Math.random() - 0.5) * 0.35,
@@ -212,7 +218,7 @@ export class MagicParticles {
         duration: 3.65,
         turns: 4.5,
         angleOffset: (Math.PI * 4) / 3,
-        colorA: [0.58, 0.98, 0.84],  // Delicate Northern-Lights Mint
+        colorA: [1.0, 0.88, 0.67],   // Pale Champagne
         colorB: [1.0, 0.92, 0.56],   // Soft Gold
         spriteIdx: 2,
         finaleDone: false
@@ -222,22 +228,22 @@ export class MagicParticles {
 
   emitSpiralGroundFinale(cx, baseY, cz) {
     // Graceful golden stardust wave blooming outward around the tree base & 34 gift boxes!
-    const count = 160;
+    const count = 84;
     for (let k = 0; k < count; k++) {
       const a = (k / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.1;
       const startR = 4.6 + Math.random() * 0.9;
       const outSpd = 1.8 + Math.random() * 2.8;
       const warm = Math.random();
-      this.spawnParticle(
+      this.spawnStarParticle(
         cx + Math.cos(a) * startR,
         baseY + 0.3 + Math.random() * 0.6,
         cz + Math.sin(a) * startR,
         Math.cos(a) * outSpd,
         0.55 + Math.random() * 1.45,
         Math.sin(a) * outSpd,
-        warm > 0.2 ? 1.0 : 0.62,
-        warm > 0.2 ? (0.86 + warm * 0.12) : 0.96,
-        warm > 0.2 ? (0.44 + warm * 0.38) : 0.85,
+        1.0,
+        0.86 + warm * 0.12,
+        0.58 + warm * 0.30,
         0.85 + Math.random() * 1.25,
         1.5 + Math.random() * 1.2,
         -0.85,
@@ -334,7 +340,7 @@ export class MagicParticles {
 
       // Smooth ease-in-out descent while orbiting around the full conical silhouette of the Christmas tree!
       const prevP = Math.max(0, (sp.age - dt) / sp.duration);
-      const subSteps = 6;
+      const subSteps = Math.max(1, Math.min(6, Math.round(dt * 120)));
 
       let headX = sp.cx;
       let headY = sp.topY;
@@ -357,16 +363,16 @@ export class MagicParticles {
         const tanX = -Math.sin(theta);
         const tanZ = Math.cos(theta);
 
-        // Emit 3 lush ribbon stardust particles per substep (~18 particles per comet per frame!)
-        for (let k = 0; k < 3; k++) {
+        // One separated spark per step, varied across the ribbon width.
+        {
           const mixC = Math.random();
           const r = sp.colorA[0] * (1 - mixC) + sp.colorB[0] * mixC;
           const g = sp.colorA[1] * (1 - mixC) + sp.colorB[1] * mixC;
           const b = sp.colorA[2] * (1 - mixC) + sp.colorB[2] * mixC;
 
-          const spread = k === 0 ? 0.08 : 0.36;
-          const isSpark = k === 0;
-          this.spawnParticle(
+          const isSpark = Math.random() < .35;
+          const spread = isSpark ? .10 : .29;
+          this.spawnStarParticle(
             px + (Math.random() - 0.5) * spread,
             y + (Math.random() - 0.5) * spread,
             pz + (Math.random() - 0.5) * spread,
@@ -388,8 +394,8 @@ export class MagicParticles {
         sprite.visible = true;
         sprite.position.set(headX, headY, headZ);
         const fade = Math.sin(p * Math.PI);
-        sprite.material.opacity = 0.88 * Math.min(1, fade * 3.2);
-        const sc = 2.0 + Math.sin(p * Math.PI * 10) * 0.35;
+        sprite.material.opacity = 0.25 * Math.min(1, fade * 2.1);
+        const sc = 1.24 + Math.sin(p * Math.PI * 10) * 0.13;
         sprite.scale.set(sc, sc, 1);
       }
     }

@@ -1607,7 +1607,8 @@ export class LuxuryChristmasTree {
     this.fairyLightMat.uniforms.uIntensity.value = 0.14 + lf * 1.15;
 
     // 1. Animate Golden Starlight Cascade Wave synchronized with the 3 descending spiral ribbons!
-    let starBurstBoost = this.starHovered ? 0.45 : 0.0;
+    let starBurstBoost = this.starHovered ? 0.16 : 0.0;
+    let starTurn = 0;
     if (this.starWaveTimer >= 0) {
       this.starWaveTimer += dt;
       const waveDuration = 3.65;
@@ -1618,8 +1619,10 @@ export class LuxuryChristmasTree {
       } else {
         // Wave travels gracefully in sync with the 3 spiraling stardust ribbons from crown down to skirt
         this.fairyLightMat.uniforms.uWaveY.value = 11.7 - Math.pow(p, 0.94) * 11.3;
-        this.fairyLightMat.uniforms.uWaveBoost.value = Math.sin(p * Math.PI) * 1.65;
-        starBurstBoost += Math.exp(-p * 3.2) * 1.75;
+        this.fairyLightMat.uniforms.uWaveBoost.value = Math.sin(p * Math.PI) * 0.32;
+        const fadeIn = THREE.MathUtils.smoothstep(p, 0, 0.075);
+        starBurstBoost += fadeIn * Math.pow(1 - p, 2.3) * 0.26;
+        starTurn = Math.sin(p * Math.PI) * 0.23;
       }
     }
 
@@ -1628,17 +1631,17 @@ export class LuxuryChristmasTree {
     this.starHaloMat.opacity = Math.min(1.0, (0.1 + lf * 0.82 + starBurstBoost * 0.35) * warmPulse);
     const haloScale = 4.8 + starBurstBoost * 1.9;
     this.starHalo.scale.set(haloScale, haloScale, 1);
-    this.starGroup.rotation.y = Math.sin(elapsedTime * 0.35) * 0.14 + (this.starWaveTimer >= 0 ? this.starWaveTimer * 1.8 : 0);
+    this.starGroup.rotation.y = Math.sin(elapsedTime * 0.35) * 0.14 + starTurn;
 
     // Gold silk ribbon catches warm star wave light
     this.ribbonMat.emissiveIntensity = 0.04 + lf * 0.32 + starBurstBoost * 0.35;
 
     // Warm festive light pool onto meadow & gifts
-    this.treeGlowLower.intensity = (lf * (this.treeGlowBack ? 17.5 : 22.0) + starBurstBoost * 12.0) * warmPulse;
+    this.treeGlowLower.intensity = (lf * (this.treeGlowBack ? 17.5 : 22.0) + starBurstBoost * 2.4) * warmPulse;
     if (this.treeGlowBack) {
-      this.treeGlowBack.intensity = (lf * 13.0 + starBurstBoost * 8.0) * warmPulse;
+      this.treeGlowBack.intensity = (lf * 13.0 + starBurstBoost * 1.6) * warmPulse;
     }
-    this.starLight.intensity = (lf * 19.0 + starBurstBoost * 24.0) * warmPulse;
+    this.starLight.intensity = (lf * 19.0 + starBurstBoost * 5.0) * warmPulse;
 
     // 2. Animate Physical Damped Pendulum Swings on Clicked Ornaments!
     if (this.activeSwings.length > 0) {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CABIN_SITES, getTerrainHeight, WATER_LEVEL } from '../utils/noise.js';
 import { getSharedNoiseLUTTexture } from '../utils/textures.js';
+import { LIGHTHOUSE } from './coastalDetails.js';
 
 // Lively Cinematic Nordic Glacial Fjord Lake Shader
 // Uses Pre-Baked Seamless Noise LUT Texture (replaces 18+ per-pixel procedural noise loops) + Pre-Culled Lake Mesh (zero discard!)
@@ -48,6 +49,7 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
   uniform float uStarIntensity;
   uniform float uCabinLightFactor;
   uniform vec3 uCabinPositions[8];
+  uniform vec3 uLighthouse;
 
   varying vec3 vWorldPos;
   varying float vDepth;
@@ -220,6 +222,18 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
       color+=vec3(.80,.48,.13)*glimmer*uCabinLightFactor*.23*(.55+.45*sin(uTime*3.0+vWorldPos.z*1.9));
     }
 
+    // Soft broken reflection from the lantern room, restricted to its shore.
+    vec2 fromBeacon = vWorldPos.xz - uLighthouse.xz;
+    if (uCabinLightFactor > .05 && dot(fromBeacon,fromBeacon) < 3600.0) {
+      float rayT = max(0.0,-dot(fromBeacon,R.xz)/max(.025,dot(R.xz,R.xz)));
+      vec2 nearest = fromBeacon+R.xz*rayT;
+      float lampY = uLighthouse.y-vWorldPos.y;
+      float flicker = .42+.58*pow(.5+.5*sin(vWorldPos.z*2.3+N.z*22.0-uTime*2.0),2.0);
+      float reach = smoothstep(0.8,7.0,rayT)*(1.0-smoothstep(39.0,60.0,rayT));
+      float lamp = exp(-dot(nearest,nearest)*.25-pow((R.y*rayT-lampY)*.24,2.0));
+      color += vec3(.88,.53,.22)*lamp*reach*flicker*uCabinLightFactor*.29;
+    }
+
     // Exponential atmospheric fog matching scene.fog
     float dist = length(cameraPosition - vWorldPos);
     float fogFactor = 1.0 - exp(-uFogDensity * uFogDensity * dist * dist);
@@ -288,7 +302,8 @@ export class FjordWater {
         uAuroraIntensity: { value: 1.0 },
         uStarIntensity: { value: 1.0 },
         uCabinLightFactor: { value: 1.0 },
-        uCabinPositions: { value: cabinPositions }
+        uCabinPositions: { value: cabinPositions },
+        uLighthouse: { value: new THREE.Vector3(LIGHTHOUSE.x, getTerrainHeight(LIGHTHOUSE.x,LIGHTHOUSE.z)+LIGHTHOUSE.lanternY*LIGHTHOUSE.scale, LIGHTHOUSE.z) }
       },
       vertexShader: WATER_VERTEX_SHADER,
       fragmentShader: WATER_FRAGMENT_SHADER
