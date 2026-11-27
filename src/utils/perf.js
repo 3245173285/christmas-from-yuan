@@ -13,8 +13,8 @@ export function detectPerformanceProfile() {
       isMobile: true,
       targetFps: 60,
       antialias: true, // Crisp edges on mobile OLED (eliminates pixelated/aliased look!)
-      pixelRatio: Math.min(dpr, 1.45), // Sharp Retina clarity without 3x oversampling
-      minAdaptiveDpr: 1.15, // Never drop into blurry 0.88x pixel-art mode!
+      pixelRatio: Math.min(dpr, 1.65), // Sharper Retina mobile visual fidelity at 60 FPS
+      minAdaptiveDpr: 1.25, // Never drop into blurry pixel-art mode!
       useBloom: false, // Direct WebGL render avoids 5-pass floating-point bloom bottleneck
       useShadowMap: false, // Pre-baked contact shadow disc eliminates periodic ShadowMap micro-stutters & 9-tap PCF
       shadowMapSize: 512,

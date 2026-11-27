@@ -357,11 +357,12 @@ export class EnvironmentDetails {
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-         // Soft organic snow-rime blending across clumps (eliminates harsh black stubble contrast against white night snow!)
+         // Natural diurnal grass thawing: lush alpine green at midday, soft rime at dawn/dusk, snowy white at night!
          float patchN = fract(sin(dot(floor(vWorldXZ * 0.2), vec2(127.1, 311.7))) * 43758.5453);
-         float snowBlend = smoothstep(0.18, 0.92, uSnowCover + (vClumpV - 0.35) * 0.25 + (patchN - 0.5) * 0.18);
-         vec3 frostSnow = vec3(0.76, 0.83, 0.91);
-         diffuseColor.rgb = mix(diffuseColor.rgb, frostSnow, snowBlend * 0.84);`
+         float snowBlend = smoothstep(0.40, 0.92, uSnowCover + (vClumpV - 0.45) * 0.16 + (patchN - 0.5) * 0.12) * smoothstep(0.28, 0.56, uSnowCover);
+         vec3 meadowRich = diffuseColor.rgb * vec3(0.72, 0.92, 0.66);
+         vec3 frostSnow = vec3(0.78, 0.85, 0.93);
+         diffuseColor.rgb = mix(meadowRich, frostSnow, snowBlend * 0.86);`
       );
     };
 

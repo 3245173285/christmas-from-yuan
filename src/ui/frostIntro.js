@@ -402,10 +402,58 @@ export class FrostIntro {
     }
   }
 
+  collectMeltEdgeSeeds() {
+    const cellW = this.w / this.gridCols;
+    const cellH = this.h / this.gridRows;
+    const rawSeeds = [];
+
+    for (let r = 0; r < this.gridRows; r++) {
+      for (let c = 0; c < this.gridCols; c++) {
+        const idx = r * this.gridCols + c;
+        if (!this.wipeGrid[idx]) continue;
+        // Identify boundary cells touching unwiped frost (the exact edges the user carved!)
+        const touchesEdge =
+          (c > 0 && !this.wipeGrid[idx - 1]) ||
+          (c < this.gridCols - 1 && !this.wipeGrid[idx + 1]) ||
+          (r > 0 && !this.wipeGrid[idx - this.gridCols]) ||
+          (r < this.gridRows - 1 && !this.wipeGrid[idx + this.gridCols]);
+
+        if (touchesEdge) {
+          rawSeeds.push({
+            x: (c + 0.5) * cellW + (Math.random() - 0.5) * cellW * 0.4,
+            y: (r + 0.5) * cellH + (Math.random() - 0.5) * cellH * 0.4,
+            speed: 0.86 + Math.random() * 0.34,
+            startR: Math.max(cellW, cellH) * 0.65
+          });
+        }
+      }
+    }
+
+    // If user clicked Enter without wiping, melt organically outward from the warm glowing center bokeh!
+    if (rawSeeds.length === 0) {
+      return [
+        { x: this.w * 0.52, y: this.h * 0.49, speed: 1.0, startR: 28 },
+        { x: this.w * 0.46, y: this.h * 0.46, speed: 0.94, startR: 22 },
+        { x: this.w * 0.56, y: this.h * 0.53, speed: 0.96, startR: 22 }
+      ];
+    }
+
+    // Subsample evenly to <= 34 frontier seeds so edge-expanding melt runs smoothly at 60 FPS on mobile!
+    if (rawSeeds.length <= 34) return rawSeeds;
+    const stride = rawSeeds.length / 34;
+    const picked = [];
+    for (let i = 0; i < 34; i++) {
+      picked.push(rawSeeds[Math.floor(i * stride)]);
+    }
+    return picked;
+  }
+
   triggerEnter() {
     if (this.melting || !this.active) return;
     this.melting = true;
     this.meltProgress = 0;
+    this.meltSeeds = this.collectMeltEdgeSeeds();
+    this.maxMeltSpread = Math.hypot(this.w, this.h) * (this.wipedCells > 0 ? 0.62 : 0.78);
     this.root.classList.add('is-melting');
     if (this.onEnter) this.onEnter();
   }
@@ -468,14 +516,56 @@ export class FrostIntro {
       const dt = Math.min(elapsedMs / 1000, 0.05);
       prev = now - (elapsedMs % frameIntervalMs);
 
-      // Smooth full-screen gentle fade + thaw dissolve when >= 40% wiped or Enter button clicked!
+      // Organic Edge-Expanding Frost Melt Dissolve: expands feathery thaw waves outward from your wiped edges to screen borders!
       if (this.melting) {
-        this.meltProgress += dt * 0.92;
-        const opacity = Math.max(0, 1.0 - Math.pow(Math.min(1, this.meltProgress), 1.15));
-        this.frostCanvas.style.opacity = opacity.toFixed(3);
-        this.fxCanvas.style.opacity = opacity.toFixed(3);
+        this.meltProgress += dt * 0.82;
+        const p = Math.min(1, this.meltProgress);
+        const ease = 1.0 - Math.pow(1.0 - p, 2.15);
+        const fCtx = this.frostCtx;
+        const seeds = this.meltSeeds || [];
 
-        if (this.meltProgress >= 1.02) {
+        for (let i = 0; i < seeds.length; i++) {
+          const s = seeds[i];
+          const curR = s.startR + ease * this.maxMeltSpread * s.speed;
+
+          // Subtle luminous icy-cyan melt frontier glow right ahead of the dissolving edge
+          if (p < 0.85) {
+            fCtx.save();
+            fCtx.globalCompositeOperation = 'source-atop';
+            const rim = fCtx.createRadialGradient(s.x, s.y, curR * 0.72, s.x, s.y, curR * 1.14);
+            rim.addColorStop(0.0, 'rgba(130, 218, 255, 0)');
+            rim.addColorStop(0.55, `rgba(142, 224, 255, ${(0.12 * (1 - p)).toFixed(3)})`);
+            rim.addColorStop(1.0, 'rgba(130, 218, 255, 0)');
+            fCtx.fillStyle = rim;
+            fCtx.beginPath();
+            fCtx.arc(s.x, s.y, curR * 1.14, 0, Math.PI * 2);
+            fCtx.fill();
+            fCtx.restore();
+          }
+
+          // Feathered radial dissolve eating the remaining frost outward to the corners
+          fCtx.save();
+          fCtx.globalCompositeOperation = 'destination-out';
+          const grad = fCtx.createRadialGradient(s.x, s.y, curR * 0.18, s.x, s.y, curR);
+          grad.addColorStop(0.0, 'rgba(0,0,0,1)');
+          grad.addColorStop(0.55, 'rgba(0,0,0,0.82)');
+          grad.addColorStop(0.84, 'rgba(0,0,0,0.28)');
+          grad.addColorStop(1.0, 'rgba(0,0,0,0)');
+          fCtx.fillStyle = grad;
+          fCtx.beginPath();
+          fCtx.arc(s.x, s.y, curR, 0, Math.PI * 2);
+          fCtx.fill();
+          fCtx.restore();
+        }
+
+        // Only soften remaining ultra-faint edge mist wisps + fx snow in the final 22%
+        if (p > 0.78) {
+          const tailFade = Math.max(0, 1.0 - (p - 0.78) / 0.22);
+          this.frostCanvas.style.opacity = tailFade.toFixed(3);
+          this.fxCanvas.style.opacity = tailFade.toFixed(3);
+        }
+
+        if (this.meltProgress >= 1.04) {
           this.active = false;
           this.root.classList.add('is-gone');
           window.removeEventListener('resize', this._onResize);

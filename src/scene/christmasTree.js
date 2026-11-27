@@ -86,15 +86,31 @@ function createTeardropFinialGeometry() {
     new THREE.Vector2(0.038, 0.19),
     new THREE.Vector2(0.0, 0.21)
   ];
-  const g = new THREE.LatheGeometry(pts, 16);
+  const g = new THREE.LatheGeometry(pts, 14);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Sculpted 3D Golden Christmas Bell hanging clearly on exterior bough tips!
+function createChristmasBellGeometry() {
+  const pts = [
+    new THREE.Vector2(0.0, -0.22),
+    new THREE.Vector2(0.06, -0.20),
+    new THREE.Vector2(0.03, -0.15),
+    new THREE.Vector2(0.195, -0.15),
+    new THREE.Vector2(0.16, -0.07),
+    new THREE.Vector2(0.12, 0.04),
+    new THREE.Vector2(0.095, 0.13),
+    new THREE.Vector2(0.045, 0.19),
+    new THREE.Vector2(0.0, 0.21)
+  ];
+  const g = new THREE.LatheGeometry(pts, 14);
   g.computeVertexNormals();
   return g;
 }
 
 function createSculptedStarGeometry() {
-  // Multi-pointed 3D luxury Nordic Bethlehem star
-  const group = new THREE.Group();
-
+  // Larger, more majestic 3D luxury Nordic Bethlehem star (~1.45x grander!)
   const makeStarLayer = (points, outerR, innerR, depth) => {
     const verts = [];
     const step = Math.PI / points;
@@ -109,9 +125,7 @@ function createSculptedStarGeometry() {
       const x1 = Math.cos(a1) * r1;
       const y1 = Math.sin(a1) * r1;
 
-      // Front face triangle
       verts.push(0, 0, depth, x0, y0, 0, x1, y1, 0);
-      // Back face triangle
       verts.push(0, 0, -depth, x1, y1, 0, x0, y0, 0);
     }
     const geo = new THREE.BufferGeometry();
@@ -121,8 +135,8 @@ function createSculptedStarGeometry() {
   };
 
   return {
-    mainGeo: makeStarLayer(8, 0.68, 0.22, 0.18),
-    innerGeo: makeStarLayer(8, 0.44, 0.16, 0.24)
+    mainGeo: makeStarLayer(8, 0.98, 0.31, 0.24),
+    innerGeo: makeStarLayer(8, 0.64, 0.23, 0.32)
   };
 }
 
@@ -588,8 +602,10 @@ export class LuxuryChristmasTree {
       map: sprigTex,
       alphaTest: 0.36,
       side: THREE.DoubleSide,
-      roughness: 0.72,
-      metalness: 0.04
+      roughness: 0.7,
+      metalness: 0.04,
+      emissive: new THREE.Color('#0c2418'),
+      emissiveIntensity: 0.42
     });
 
     // Inject natural gentle breeze sway into vertex shader
@@ -711,9 +727,9 @@ export class LuxuryChristmasTree {
       const baseY = this.skirtStartY + hNorm * (this.treeHeight - this.skirtStartY - 0.35);
       const angle = t * Math.PI * 2 * turns + 0.4;
 
-      // Gentle catenary drape wave between outer boughs
+      // Gentle catenary drape wave cleanly outside the outer spruce tips (never buried in foliage!)
       const drapeSag = Math.sin(angle * 4.0) * 0.12 * (1.0 - hNorm * 0.5);
-      const r = getTreeRadiusAtHeight(hNorm) * 0.98 + 0.08 + Math.cos(angle * 4.0) * 0.06;
+      const r = getTreeRadiusAtHeight(hNorm) * 1.07 + 0.22 + Math.cos(angle * 4.0) * 0.06;
 
       const cx = Math.sin(angle) * r;
       const cz = Math.cos(angle) * r;
@@ -772,10 +788,11 @@ export class LuxuryChristmasTree {
   }
 
   buildLuxuryOrnaments() {
-    // 4 bespoke luxury PBR finishes + spherical & teardrop finial geometries
+    // 4 bespoke luxury PBR finishes + spherical baubles, teardrop finials & EXTERIOR GOLDEN CHRISTMAS BELLS!
     const isMob = Boolean(this.perf.isMobile);
-    const sphereGeo = new THREE.SphereGeometry(0.165, isMob ? 12 : 18, isMob ? 10 : 14);
+    const sphereGeo = new THREE.SphereGeometry(0.175, isMob ? 12 : 18, isMob ? 10 : 14);
     const finialGeo = createTeardropFinialGeometry();
+    const bellGeo = createChristmasBellGeometry();
     const capGeo = new THREE.CylinderGeometry(0.036, 0.042, 0.06, isMob ? 6 : 10);
 
     const addPendulumSway = (mat) => {
@@ -801,32 +818,40 @@ export class LuxuryChristmasTree {
 
     const OrnMatCtor = isMob ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
     const matGold = new OrnMatCtor({
-      color: '#ebd08a',
-      metalness: 0.95,
+      color: '#f2d68e',
+      emissive: new THREE.Color('#5a3e0e'),
+      emissiveIntensity: 0.22,
+      metalness: 0.94,
       roughness: 0.14,
       ...(isMob ? {} : { clearcoat: 0.75, clearcoatRoughness: 0.08 }),
-      envMapIntensity: 1.9
+      envMapIntensity: 2.0
     });
     const matCrimson = new OrnMatCtor({
-      color: '#911120',
+      color: '#a81426',
+      emissive: new THREE.Color('#3a060c'),
+      emissiveIntensity: 0.24,
       metalness: isMob ? 0.42 : 0.28,
       roughness: 0.1,
       ...(isMob ? {} : { clearcoat: 1.0, clearcoatRoughness: 0.04 }),
-      envMapIntensity: 2.0
+      envMapIntensity: 2.05
     });
     const matSilver = new OrnMatCtor({
-      color: '#e5edf7',
+      color: '#edf4fc',
+      emissive: new THREE.Color('#2c3a4c'),
+      emissiveIntensity: 0.18,
       metalness: 0.88,
-      roughness: 0.18,
-      ...(isMob ? {} : { clearcoat: 0.8, clearcoatRoughness: 0.1 }),
-      envMapIntensity: 1.85
-    });
-    const matRose = new OrnMatCtor({
-      color: '#d99e73',
-      metalness: 0.9,
       roughness: 0.16,
-      ...(isMob ? {} : { clearcoat: 0.75, clearcoatRoughness: 0.08 }),
-      envMapIntensity: 1.85
+      ...(isMob ? {} : { clearcoat: 0.8, clearcoatRoughness: 0.1 }),
+      envMapIntensity: 1.95
+    });
+    const matBellGold = new OrnMatCtor({
+      color: '#f5cf72',
+      emissive: new THREE.Color('#664410'),
+      emissiveIntensity: 0.28,
+      metalness: 0.95,
+      roughness: 0.16,
+      ...(isMob ? {} : { clearcoat: 0.72, clearcoatRoughness: 0.09 }),
+      envMapIntensity: 2.1
     });
     const capMat = new THREE.MeshStandardMaterial({
       color: '#e8c56b',
@@ -834,30 +859,32 @@ export class LuxuryChristmasTree {
       roughness: 0.22
     });
 
-    [matGold, matCrimson, matSilver, matRose].forEach(addPendulumSway);
+    [matGold, matCrimson, matSilver, matBellGold].forEach(addPendulumSway);
 
     const groups = {
       goldSpheres: [],
       crimsonSpheres: [],
       silverSpheres: [],
-      roseFinials: [],
+      goldenBells: [],
       caps: []
     };
 
     const dummy = new THREE.Object3D();
-    const totalOrnaments = 235;
+    const totalOrnaments = 240;
 
     for (let i = 0; i < totalOrnaments; i++) {
-      // Golden-angle phyllotaxis distribution for balanced luxury styling
-      const hNorm = 0.04 + Math.pow(i / totalOrnaments, 0.78) * 0.87;
+      // Golden-angle phyllotaxis positioned cleanly on the EXTERIOR bough tips (never buried inside pine needles!)
+      const hNorm = 0.05 + Math.pow(i / totalOrnaments, 0.78) * 0.86;
       const y = this.skirtStartY + hNorm * (this.treeHeight - this.skirtStartY - 0.55);
-      const angle = i * 2.399963 + (this.rand() - 0.5) * 0.3;
+      const angle = i * 2.399963 + (this.rand() - 0.5) * 0.28;
       const treeR = getTreeRadiusAtHeight(hNorm);
-      const r = treeR * (0.76 + this.rand() * 0.26);
+      // Hang proudly outside the pine needle silhouette (with extra outward clearance on mobile!)
+      const outPad = isMob ? 0.24 : 0.16;
+      const r = treeR * (1.03 + this.rand() * 0.13) + outPad;
 
       const x = Math.sin(angle) * r;
       const z = Math.cos(angle) * r;
-      const sc = (0.72 + (1.0 - hNorm) * 0.55) * (0.82 + this.rand() * 0.36);
+      const sc = (0.78 + (1.0 - hNorm) * 0.52) * (0.86 + this.rand() * 0.34);
 
       dummy.position.set(x, y, z);
       dummy.rotation.set(0, angle, 0);
@@ -865,17 +892,17 @@ export class LuxuryChristmasTree {
       dummy.updateMatrix();
       const mat4 = dummy.matrix.clone();
 
-      // Gold ornament crown cap above each bauble
-      dummy.position.set(x, y + 0.165 * sc, z);
+      // Gold ornament crown cap above each bauble/bell
+      dummy.position.set(x, y + 0.175 * sc, z);
       dummy.scale.setScalar(sc);
       dummy.updateMatrix();
       groups.caps.push(dummy.matrix.clone());
 
       const roll = this.rand();
-      if (roll < 0.36) groups.goldSpheres.push(mat4);
-      else if (roll < 0.66) groups.crimsonSpheres.push(mat4);
-      else if (roll < 0.86) groups.silverSpheres.push(mat4);
-      else groups.roseFinials.push(mat4);
+      if (roll < 0.28) groups.goldSpheres.push(mat4);
+      else if (roll < 0.56) groups.crimsonSpheres.push(mat4);
+      else if (roll < 0.74) groups.silverSpheres.push(mat4);
+      else groups.goldenBells.push(mat4);
     }
 
     const addInst = (geo, mat, list, isInteractive = true) => {
@@ -892,7 +919,7 @@ export class LuxuryChristmasTree {
         }
       }
       inst.instanceMatrix.needsUpdate = true;
-      inst.castShadow = true;
+      inst.castShadow = !isMob;
       this.group.add(inst);
       if (isInteractive) {
         this.ornamentMeshes.push(inst);
@@ -903,7 +930,7 @@ export class LuxuryChristmasTree {
     addInst(sphereGeo, matGold, groups.goldSpheres, true);
     addInst(sphereGeo, matCrimson, groups.crimsonSpheres, true);
     addInst(sphereGeo, matSilver, groups.silverSpheres, true);
-    addInst(finialGeo, matRose, groups.roseFinials, true);
+    addInst(bellGeo, matBellGold, groups.goldenBells, true);
     addInst(capGeo, capMat, groups.caps, false);
   }
 
@@ -972,22 +999,24 @@ export class LuxuryChristmasTree {
     const warm3 = new THREE.Color('#ffe4ad');
     const tmp = new THREE.Color();
 
+    const isMob = Boolean(this.perf.isMobile);
     for (let i = 0; i < count; i++) {
-      // Spiral + organic branch scatter
+      // Spiral + outer branch-tip scatter so every fairy light gleams cleanly OUTSIDE the foliage!
       const u = i / count;
       const hNorm = Math.pow(u, 0.72) * 0.94 + 0.02;
       const y = this.skirtStartY + hNorm * (this.treeHeight - this.skirtStartY - 0.25) + (this.rand() - 0.5) * 0.24;
       const angle = i * 0.6180339 * Math.PI * 2 + u * 24.0 + (this.rand() - 0.5) * 0.45;
       const treeR = getTreeRadiusAtHeight(hNorm);
-      // Mix deep inner glow lights and outer branch-tip lights for spatial depth
-      const r = treeR * (0.55 + this.rand() * 0.52);
+      // Positioned cleanly at the exterior tips so pine fronds never swallow the lights (extra clear on mobile!)
+      const outPad = isMob ? 0.24 : 0.14;
+      const r = treeR * (1.02 + this.rand() * 0.16) + outPad;
 
       positions[i * 3] = Math.sin(angle) * r;
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = Math.cos(angle) * r;
 
       phases[i] = this.rand() * Math.PI * 2;
-      sizes[i] = 0.65 + this.rand() * 0.95;
+      sizes[i] = (0.76 + this.rand() * 0.98) * (isMob ? 1.32 : 1.0);
 
       const cRoll = this.rand();
       tmp.copy(cRoll < 0.45 ? warm1 : cRoll < 0.8 ? warm2 : warm3);
@@ -1085,38 +1114,38 @@ export class LuxuryChristmasTree {
     });
 
     this.starGroup = new THREE.Group();
-    this.starGroup.position.set(0, this.treeHeight + 0.32, 0);
+    this.starGroup.position.set(0, this.treeHeight + 0.66, 0);
 
     const outerStar = new THREE.Mesh(mainGeo, this.starMat);
     const innerStar = new THREE.Mesh(innerGeo, this.starMat);
     innerStar.rotation.z = Math.PI / 8;
 
-    // Ornate coiled brass mounting base
+    // Ornate coiled brass mounting base rising cleanly above top pine needles
     const coil = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.13, 0.45, 12),
-      new THREE.MeshStandardMaterial({ color: '#d8b25c', metalness: 0.9, roughness: 0.25 })
+      new THREE.CylinderGeometry(0.08, 0.16, 0.72, 12),
+      new THREE.MeshStandardMaterial({ color: '#e0b960', metalness: 0.9, roughness: 0.22 })
     );
-    coil.position.y = -0.52;
+    coil.position.y = -0.78;
 
     this.starGroup.add(outerStar, innerStar, coil);
 
-    // Soft glowing volumetric halo sprite around the crown star
-    const haloTex = createSoftGlowTexture(128, 'rgba(255,248,220,0.95)', 'rgba(255,205,110,0.38)');
+    // Soft glowing volumetric halo sprite around the grand crown star
+    const haloTex = createSoftGlowTexture(128, 'rgba(255,248,220,0.96)', 'rgba(255,205,110,0.44)');
     this.starHaloMat = new THREE.SpriteMaterial({
       map: haloTex,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
     const halo = new THREE.Sprite(this.starHaloMat);
-    halo.scale.set(3.4, 3.4, 1);
+    halo.scale.set(4.8, 4.8, 1);
     this.starHalo = halo;
     this.starGroup.add(halo);
 
     // Generous invisible click collider around star topper so it is effortless to click from any distance
     this.starHitMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(1.15, 12, 10),
+      new THREE.SphereGeometry(1.45, 12, 10),
       new THREE.MeshBasicMaterial({ visible: false })
     );
     this.starGroup.add(this.starHitMesh);
@@ -1126,7 +1155,7 @@ export class LuxuryChristmasTree {
 
   getStarWorldPosition() {
     this.group.updateMatrixWorld(true);
-    return new THREE.Vector3(0, this.treeHeight + 0.32, 0).applyMatrix4(this.group.matrixWorld);
+    return new THREE.Vector3(0, this.treeHeight + 0.66, 0).applyMatrix4(this.group.matrixWorld);
   }
 
   setStarHovered(hovered) {
@@ -1573,7 +1602,7 @@ export class LuxuryChristmasTree {
     // Star topper radiance, hover swell & graceful rotation
     this.starMat.emissiveIntensity = (0.25 + lf * 2.15 + starBurstBoost * 1.4) * warmPulse;
     this.starHaloMat.opacity = Math.min(1.0, (0.1 + lf * 0.82 + starBurstBoost * 0.35) * warmPulse);
-    const haloScale = 3.4 + starBurstBoost * 1.6;
+    const haloScale = 4.8 + starBurstBoost * 1.9;
     this.starHalo.scale.set(haloScale, haloScale, 1);
     this.starGroup.rotation.y = Math.sin(elapsedTime * 0.35) * 0.14 + (this.starWaveTimer >= 0 ? this.starWaveTimer * 1.8 : 0);
 

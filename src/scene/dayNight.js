@@ -507,19 +507,32 @@ export class DayNightSystem {
       -0.65
     ).normalize();
 
-    // Key light switches smoothly between sun (day/dawn/dusk) and moon (night)
-    const isDayKey = sunElev > -0.05;
+    // Key light cross-fades cleanly through zero intensity right at the horizon (-0.05) so Sun <-> Moon swap has ZERO flash or shadow jump!
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    const ss = (e0, e1, x) => {
+      const u = clamp01((x - e0) / (e1 - e0));
+      return u * u * (3 - 2 * u);
+    };
+    const isDayKey = sunElev >= -0.05;
     const activeDir = isDayKey ? s.sunDir : s.moonDir;
+    const horizonCrossFade = isDayKey
+      ? ss(-0.05, 0.09, sunElev)
+      : ss(-0.05, -0.17, sunElev);
+    const baseKeyIntensity = smoothLerp(k0.sunIntensity, k1.sunIntensity, rawT);
+
     this.keyLight.position.copy(activeDir).multiplyScalar(115);
     this.keyLight.color.copy(s.sunColor);
-    this.keyLight.intensity = smoothLerp(k0.sunIntensity, k1.sunIntensity, rawT);
+    this.keyLight.intensity = baseKeyIntensity * horizonCrossFade;
+
+    // Gentle hemisphere ambient lift right during the brief horizon cross-fade so scene brightness stays silky even!
+    const twilightCarry = (1.0 - horizonCrossFade) * 0.24;
 
     // Subtle green-teal aurora ambient cast on snow and grass at night
     this.auroraFillLight.intensity = s.auroraIntensity * 0.42;
 
     this.hemiLight.color.copy(k0.hemiSky).lerp(k1.hemiSky, t);
     this.hemiLight.groundColor.copy(k0.hemiGround).lerp(k1.hemiGround, t);
-    this.hemiLight.intensity = smoothLerp(k0.hemiIntensity, k1.hemiIntensity, rawT);
+    this.hemiLight.intensity = smoothLerp(k0.hemiIntensity, k1.hemiIntensity, rawT) + twilightCarry;
     this.ambientLight.intensity = smoothLerp(k0.ambientIntensity, k1.ambientIntensity, rawT);
 
     this.fog.color.copy(s.fogColor);
@@ -527,16 +540,11 @@ export class DayNightSystem {
 
     this.renderer.toneMappingExposure = smoothLerp(k0.exposure, k1.exposure, rawT);
 
-    // Swap PMREM environment map cleanly by period
-    let targetEnv = 'night';
-    if (h >= 8.2 && h <= 16.0) {
-      targetEnv = 'day';
-    } else if ((h >= 5.5 && h < 8.2) || (h > 16.0 && h <= 19.6)) {
-      targetEnv = 'twilight';
-    }
-    if (targetEnv !== this.currentEnvKey) {
-      this.currentEnvKey = targetEnv;
-      this.scene.environment = this.envMaps[targetEnv];
+    // Keep one continuous balanced Nordic PMREM environment map (avoids jarring discrete PBR envMap swaps at 5:30/8:12/16:00!)
+    // Smooth time-of-day mood & brightness are continuously driven by environmentIntensity + hemiLight + keyLight.
+    if (this.currentEnvKey !== 'twilight') {
+      this.currentEnvKey = 'twilight';
+      this.scene.environment = this.envMaps.twilight;
     }
     if ('environmentIntensity' in this.scene) {
       this.scene.environmentIntensity = smoothLerp(k0.envIntensity, k1.envIntensity, rawT);

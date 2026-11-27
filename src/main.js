@@ -250,10 +250,11 @@ function initNordicChristmas() {
 
     const dayState = dayNight.update(dt);
 
-    // On-demand directional shadow baking: only re-render shadow map when sun/moon direction moves > ~0.4 degrees
+    // Smooth continuous directional shadows whenever sun/moon moves (eliminates stepped frame-by-frame shadow jumps while staying 0-cost when paused!)
     if (renderer.shadowMap.enabled) {
       curLightDir.copy(dayNight.keyLight.position).normalize();
-      if (!hasBakedInitialShadow || curLightDir.distanceToSquared(lastShadowLightDir) > 0.00005) {
+      const isTransitioning = dayNight.targetHours !== null;
+      if (!hasBakedInitialShadow || isTransitioning || curLightDir.distanceToSquared(lastShadowLightDir) > 0.0000008) {
         lastShadowLightDir.copy(curLightDir);
         renderer.shadowMap.needsUpdate = true;
         hasBakedInitialShadow = true;
