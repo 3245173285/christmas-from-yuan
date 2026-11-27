@@ -1,9 +1,14 @@
 import { CARD_STICKER_MAP, CARD_STICKERS, CARD_STYLE_MAP, CARD_STYLES } from '../data/wishCardsConfig.js';
-import { isCloudBackendEnabled, submitWishCard } from '../services/wishCardsService.js';
+import {
+  clearAdminToken,
+  deleteWishCard,
+  getAdminToken,
+  submitWishCard,
+  updateWishCard,
+  verifyAdminPassword
+} from '../services/wishCardsService.js';
 
-// Interactive 5-Style 3D Tilt & Material-Reflective Christmas Card Studio + Tree Card Viewer
-// Supports: 5 bespoke material reflections, drag/scale/rotate stickers, custom message + dedicated signature,
-// smooth mouse/touch 3D tilt preview, and real-time hanging onto Yuan's 3D Christmas tree!
+// Interactive 5-Style 3D Tilt & Material-Reflective Christmas Card Studio + Tree Card Viewer + Secret Yuan Admin Manager
 
 function escapeHtml(str) {
   return String(str || '')
@@ -26,8 +31,9 @@ function formatShortDate(iso) {
 }
 
 export class WishCardStudio {
-  constructor({ onCardSubmitted, onOpenChange } = {}) {
+  constructor({ onCardSubmitted, onCardsMutated, onOpenChange } = {}) {
     this.onCardSubmitted = onCardSubmitted;
+    this.onCardsMutated = onCardsMutated;
     this.onOpenChange = onOpenChange;
 
     this.cards = [];
@@ -35,7 +41,11 @@ export class WishCardStudio {
     this.mode = 'create'; // 'create' | 'preview' | 'gallery' | 'viewer'
     this.viewingCard = null;
 
-    // Draft state for card creation
+    // Yuan Admin state (authenticated via Cloudflare Worker encrypted ADMIN_PASSWORD secret)
+    this.isAdmin = Boolean(getAdminToken());
+    this.editingCardId = null;
+    this.confirmDeleteId = null;
+
     this.draft = {
       style: 'parchment',
       message: '',
@@ -49,7 +59,6 @@ export class WishCardStudio {
     this.draggingSticker = null;
     this.submitting = false;
 
-    // Smooth 3D tilt spring state (runs only while studio/viewer is open!)
     this.tiltTarget = { rx: 0, ry: 0, gx: 50, gy: 35, px: 0, py: 0 };
     this.tiltCur = { rx: 0, ry: 0, gx: 50, gy: 35, px: 0, py: 0 };
     this.tiltRaf = null;
@@ -59,6 +68,7 @@ export class WishCardStudio {
     this.renderStylePicker();
     this.renderStickerTray();
     this.bindEvents();
+    this.syncAdminUI();
     this.renderLiveCard();
   }
 
@@ -70,11 +80,13 @@ export class WishCardStudio {
     this.tabGallery = document.getElementById('tab-studio-gallery');
     this.galleryCountBadge = document.getElementById('studio-gallery-count');
 
+    this.adminModeBar = document.getElementById('admin-mode-bar');
+    this.btnAdminLogout = document.getElementById('btn-admin-logout');
+
     this.paneCreate = document.getElementById('studio-pane-create');
     this.paneGallery = document.getElementById('studio-pane-gallery');
     this.paneViewer = document.getElementById('studio-pane-viewer');
 
-    // Create mode elements
     this.previewStage = document.getElementById('studio-card-stage');
     this.cardEl = document.getElementById('studio-reflective-card');
     this.stylePicker = document.getElementById('studio-style-picker');
@@ -85,16 +97,30 @@ export class WishCardStudio {
     this.inputSignature = document.getElementById('studio-input-signature');
     this.charCountEl = document.getElementById('studio-char-count');
     this.btnTogglePreview = document.getElementById('btn-toggle-3d-preview');
+    this.btnCancelEdit = document.getElementById('btn-cancel-edit-card');
     this.btnSubmit = document.getElementById('btn-submit-wish-card');
     this.statusMsg = document.getElementById('studio-status-msg');
 
-    // Gallery & Viewer elements
     this.galleryGrid = document.getElementById('studio-gallery-grid');
+    this.galleryStatusMsg = document.getElementById('gallery-status-msg');
     this.viewerStage = document.getElementById('viewer-card-stage');
     this.viewerCardEl = document.getElementById('viewer-reflective-card');
     this.viewerMeta = document.getElementById('viewer-card-meta');
+    this.viewerStatusMsg = document.getElementById('viewer-status-msg');
+    this.viewerAdminActions = document.getElementById('viewer-admin-actions');
+    this.btnViewerPin = document.getElementById('btn-viewer-pin');
+    this.btnViewerEdit = document.getElementById('btn-viewer-edit');
+    this.btnViewerDelete = document.getElementById('btn-viewer-delete');
     this.btnViewerBack = document.getElementById('btn-viewer-back');
     this.btnViewerWrite = document.getElementById('btn-viewer-write');
+
+    // Secret Admin Unlock Modal
+    this.unlockModal = document.getElementById('admin-unlock-modal');
+    this.unlockForm = document.getElementById('admin-unlock-form');
+    this.unlockInput = document.getElementById('admin-password-input');
+    this.unlockError = document.getElementById('admin-unlock-error');
+    this.btnUnlockCancel = document.getElementById('btn-admin-cancel');
+    this.btnUnlockSubmit = document.getElementById('btn-admin-unlock');
   }
 
   setCards(cards = []) {
@@ -107,32 +133,132 @@ export class WishCardStudio {
     }
   }
 
+  syncAdminUI() {
+    if (this.adminModeBar) {
+      this.adminModeBar.hidden = !this.isAdmin;
+    }
+    if (this.viewerAdminActions) {
+      const isSeed = this.viewingCard && String(this.viewingCard.id).startsWith('seed-');
+      this.viewerAdminActions.hidden = !(this.isAdmin && this.viewingCard && !isSeed);
+    }
+    if (this.btnCancelEdit) {
+      this.btnCancelEdit.hidden = !this.editingCardId;
+    }
+    if (this.btnSubmit && !this.submitting) {
+      this.btnSubmit.textContent = this.editingCardId
+        ? '💾 保存修改并同步圣诞树'
+        : '🎄 送给 Yuan 并挂上圣诞树';
+    }
+    if (this.mode === 'gallery') {
+      this.renderGallery();
+    }
+  }
+
+  openAdminUnlock() {
+    if (this.isAdmin) {
+      this.openGallery();
+      return;
+    }
+    if (!this.unlockModal) return;
+    if (this.unlockError) {
+      this.unlockError.textContent = '';
+      this.unlockError.classList.remove('is-visible');
+    }
+    if (this.unlockInput) this.unlockInput.value = '';
+    this.unlockModal.classList.add('is-open');
+    this.unlockModal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => {
+      if (this.unlockInput) this.unlockInput.focus();
+    }, 60);
+  }
+
+  closeAdminUnlock() {
+    if (!this.unlockModal) return;
+    this.unlockModal.classList.remove('is-open');
+    this.unlockModal.setAttribute('aria-hidden', 'true');
+  }
+
+  resetToCreateMode() {
+    this.editingCardId = null;
+    this.draft.message = '';
+    this.draft.signature = '';
+    if (this.inputMessage) this.inputMessage.value = '';
+    if (this.inputSignature) this.inputSignature.value = '';
+    if (this.charCountEl) this.charCountEl.textContent = '0 / 280';
+    this.syncAdminUI();
+  }
+
+  startEditCard(card) {
+    if (!card || !this.isAdmin) return;
+    if (String(card.id).startsWith('seed-')) {
+      this.showGalleryStatus('预设示例卡无需编辑，收到第一张真实贺卡后会自动替换哦', true);
+      return;
+    }
+    this.editingCardId = card.id;
+    this.draft = {
+      style: card.style || 'parchment',
+      message: card.message || '',
+      signature: card.signature || '',
+      stickers: (card.stickers || []).map((s, idx) => ({
+        uid: `ed-${idx}-${Date.now()}`,
+        id: s.id,
+        x: s.x,
+        y: s.y,
+        scale: s.scale,
+        rot: s.rot
+      }))
+    };
+    this.selectedStickerUid = null;
+    if (this.inputMessage) this.inputMessage.value = this.draft.message;
+    if (this.inputSignature) this.inputSignature.value = this.draft.signature;
+    if (this.charCountEl) this.charCountEl.textContent = `${this.draft.message.length} / 280`;
+
+    this.mode = 'create';
+    this.showStatus('正在编辑云端贺卡，修改后点击保存即可同步圣诞树', false);
+    this.syncModeView();
+    this.syncAdminUI();
+    this.renderLiveCard();
+  }
+
   openCreate() {
+    if (this.editingCardId) {
+      this.resetToCreateMode();
+    }
     this.mode = 'create';
     this.selectedStickerUid = null;
     this.showStatus('');
     this.openModal();
     this.syncModeView();
+    this.syncAdminUI();
     this.renderLiveCard();
   }
 
   openGallery() {
     this.mode = 'gallery';
+    this.confirmDeleteId = null;
+    this.showGalleryStatus('');
     this.openModal();
     this.syncModeView();
+    this.syncAdminUI();
     this.renderGallery();
   }
 
   openViewer(card) {
     if (!card) return;
     this.viewingCard = card;
+    this.confirmDeleteId = null;
     this.mode = 'viewer';
+    this.showViewerStatus('');
     this.openModal();
     this.syncModeView();
+    this.syncAdminUI();
     this.renderCardSurface(this.viewerCardEl, card, false);
     if (this.viewerMeta) {
       const st = CARD_STYLE_MAP[card.style] || CARD_STYLE_MAP.parchment;
       this.viewerMeta.textContent = `${st.name} · ${st.materialTag} · ${formatShortDate(card.createdAt)}`;
+    }
+    if (this.btnViewerDelete) {
+      this.btnViewerDelete.textContent = '🗑️ 删除贺卡';
     }
   }
 
@@ -149,6 +275,7 @@ export class WishCardStudio {
     if (!this.isOpen || !this.backdrop) return;
     this.isOpen = false;
     this.draggingSticker = null;
+    this.confirmDeleteId = null;
     this.backdrop.classList.remove('is-open');
     this.backdrop.setAttribute('aria-hidden', 'true');
     this.stopTiltLoop();
@@ -177,7 +304,6 @@ export class WishCardStudio {
       this.btnTogglePreview.classList.toggle('is-active', isPreviewOnly);
     }
 
-    // Reset tilt gently on mode change
     this.tiltTarget = { rx: 0, ry: 0, gx: 50, gy: 35, px: 0, py: 0 };
   }
 
@@ -303,19 +429,35 @@ export class WishCardStudio {
       const snippet = escapeHtml(c.message.slice(0, 48) + (c.message.length > 48 ? '…' : ''));
       const sig = escapeHtml(c.signature);
       const count = (c.stickers || []).length;
+      const isSeed = String(c.id).startsWith('seed-');
+      const confirming = this.confirmDeleteId === c.id;
+
+      const adminControls = this.isAdmin
+        ? (isSeed
+            ? `<div class="gci-admin-bar"><span class="gci-seed-note">预设示例卡（收到真实卡后自动替换）</span></div>`
+            : `<div class="gci-admin-bar">
+                <button type="button" class="ws-admin-btn is-sm" data-admin-act="pin" data-card-id="${escapeHtml(c.id)}">📌 置顶</button>
+                <button type="button" class="ws-admin-btn is-sm" data-admin-act="edit" data-card-id="${escapeHtml(c.id)}">✏️ 编辑</button>
+                <button type="button" class="ws-admin-btn is-sm is-danger" data-admin-act="delete" data-card-id="${escapeHtml(c.id)}">${confirming ? '确认删除？' : '🗑️ 删除'}</button>
+              </div>`)
+        : '';
+
       return `
-        <button type="button" class="gallery-card-item" data-card-id="${escapeHtml(c.id)}" data-style="${st.id}">
-          <div class="gci-top">
-            <span class="gci-dot" style="background: ${st.swatch};"></span>
-            <span class="gci-style">${st.name}</span>
-            <span class="gci-date">${formatShortDate(c.createdAt)}</span>
-          </div>
-          <p class="gci-msg">${snippet}</p>
-          <div class="gci-foot">
-            <span class="gci-stickers">${count > 0 ? `✨ ${count} 枚贴纸` : '经典纯文字'}</span>
-            <span class="gci-sig">— ${sig}</span>
-          </div>
-        </button>
+        <div class="gallery-card-wrap">
+          <button type="button" class="gallery-card-item" data-card-id="${escapeHtml(c.id)}" data-style="${st.id}">
+            <div class="gci-top">
+              <span class="gci-dot" style="background: ${st.swatch};"></span>
+              <span class="gci-style">${st.name}</span>
+              <span class="gci-date">${formatShortDate(c.createdAt)}</span>
+            </div>
+            <p class="gci-msg">${snippet}</p>
+            <div class="gci-foot">
+              <span class="gci-stickers">${count > 0 ? `✨ ${count} 枚贴纸` : '经典纯文字'}</span>
+              <span class="gci-sig">— ${sig}</span>
+            </div>
+          </button>
+          ${adminControls}
+        </div>
       `;
     }).join('');
   }
@@ -327,6 +469,20 @@ export class WishCardStudio {
     this.statusMsg.classList.toggle('is-visible', Boolean(text));
   }
 
+  showGalleryStatus(text, isError = false) {
+    if (!this.galleryStatusMsg) return;
+    this.galleryStatusMsg.textContent = text;
+    this.galleryStatusMsg.classList.toggle('is-error', isError);
+    this.galleryStatusMsg.classList.toggle('is-visible', Boolean(text));
+  }
+
+  showViewerStatus(text, isError = false) {
+    if (!this.viewerStatusMsg) return;
+    this.viewerStatusMsg.textContent = text;
+    this.viewerStatusMsg.classList.toggle('is-error', isError);
+    this.viewerStatusMsg.classList.toggle('is-visible', Boolean(text));
+  }
+
   addSticker(stickerId) {
     if (this.draft.stickers.length >= 12) {
       this.showStatus('每张贺卡最多可以贴 12 枚贴纸哦 ✨', true);
@@ -334,7 +490,6 @@ export class WishCardStudio {
     }
     this.showStatus('');
     const uid = `st-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    // Place near varied perimeter corners so it doesn't cover the center text immediately
     const spots = [
       [18, 22], [82, 22], [18, 78], [82, 74],
       [50, 14], [15, 50], [85, 48], [50, 84]
@@ -375,7 +530,6 @@ export class WishCardStudio {
     this.renderLiveCard();
   }
 
-  // Compute interactive 3D tilt & material glare coordinates from pointer over card stage
   updateTiltFromPointer(clientX, clientY, stageEl) {
     if (!stageEl) return;
     const rect = stageEl.getBoundingClientRect();
@@ -411,7 +565,6 @@ export class WishCardStudio {
         this.tiltRaf = null;
         return;
       }
-      // Subtle ambient breathing shimmer when idle in preview/viewer so material reflections come alive immediately!
       if (!this.isPointerTilting && (this.mode === 'preview' || this.mode === 'viewer')) {
         const t = now * 0.0012;
         this.tiltTarget.ry = Math.sin(t) * 6.5;
@@ -466,7 +619,6 @@ export class WishCardStudio {
           }
           return;
         }
-        // Clicking blank area of card deselects active sticker
         if (this.selectedStickerUid) {
           this.selectedStickerUid = null;
           this.renderLiveCard();
@@ -512,6 +664,62 @@ export class WishCardStudio {
     stageEl.addEventListener('pointerleave', endTilt);
   }
 
+  async handleAdminPin(cardId, fromViewer = false) {
+    try {
+      const { cards } = await updateWishCard(cardId, { pin: true });
+      this.setCards(cards);
+      if (this.onCardsMutated) this.onCardsMutated(cards);
+      if (fromViewer) {
+        this.showViewerStatus('📌 已置顶到圣诞树最前排枝桠！', false);
+      } else {
+        this.showGalleryStatus('📌 已置顶到圣诞树最前排枝桠！', false);
+      }
+    } catch (err) {
+      if (!getAdminToken()) {
+        this.isAdmin = false;
+        this.syncAdminUI();
+      }
+      if (fromViewer) this.showViewerStatus(err.message, true);
+      else this.showGalleryStatus(err.message, true);
+    }
+  }
+
+  async handleAdminDelete(cardId, fromViewer = false) {
+    if (this.confirmDeleteId !== cardId) {
+      this.confirmDeleteId = cardId;
+      if (fromViewer && this.btnViewerDelete) {
+        this.btnViewerDelete.textContent = '再点一次确认删除';
+      } else {
+        this.renderGallery();
+      }
+      return;
+    }
+
+    this.confirmDeleteId = null;
+    try {
+      const { cards } = await deleteWishCard(cardId);
+      this.setCards(cards);
+      if (this.onCardsMutated) this.onCardsMutated(cards);
+      if (fromViewer) {
+        this.viewingCard = null;
+        this.mode = 'gallery';
+        this.syncModeView();
+        this.syncAdminUI();
+        this.renderGallery();
+        this.showGalleryStatus('🗑️ 贺卡已从云端和圣诞树上移除', false);
+      } else {
+        this.showGalleryStatus('🗑️ 贺卡已从云端和圣诞树上移除', false);
+      }
+    } catch (err) {
+      if (!getAdminToken()) {
+        this.isAdmin = false;
+        this.syncAdminUI();
+      }
+      if (fromViewer) this.showViewerStatus(err.message, true);
+      else this.showGalleryStatus(err.message, true);
+    }
+  }
+
   bindEvents() {
     if (this.btnClose) {
       this.btnClose.addEventListener('click', () => this.close());
@@ -522,20 +730,85 @@ export class WishCardStudio {
       });
     }
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.isOpen) this.close();
+      if (e.key === 'Escape') {
+        if (this.unlockModal && this.unlockModal.classList.contains('is-open')) {
+          this.closeAdminUnlock();
+        } else if (this.isOpen) {
+          this.close();
+        }
+      }
     });
+
+    // Secret Admin Unlock Modal Events
+    if (this.btnUnlockCancel) {
+      this.btnUnlockCancel.addEventListener('click', () => this.closeAdminUnlock());
+    }
+    if (this.unlockModal) {
+      this.unlockModal.addEventListener('click', (e) => {
+        if (e.target === this.unlockModal) this.closeAdminUnlock();
+      });
+    }
+    if (this.unlockForm) {
+      this.unlockForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pwd = this.unlockInput ? this.unlockInput.value : '';
+        if (this.btnUnlockSubmit) {
+          this.btnUnlockSubmit.disabled = true;
+          this.btnUnlockSubmit.textContent = '验证中…';
+        }
+        try {
+          await verifyAdminPassword(pwd);
+          this.isAdmin = true;
+          this.closeAdminUnlock();
+          this.openGallery();
+          this.showGalleryStatus('👑 已进入 Yuan 贺卡管理模式，可编辑、置顶或删除云端贺卡', false);
+        } catch (err) {
+          if (this.unlockError) {
+            this.unlockError.textContent = err.message || '管理密码不正确';
+            this.unlockError.classList.add('is-visible');
+          }
+        } finally {
+          if (this.btnUnlockSubmit) {
+            this.btnUnlockSubmit.disabled = false;
+            this.btnUnlockSubmit.textContent = '解锁管理';
+          }
+        }
+      });
+    }
+
+    if (this.btnAdminLogout) {
+      this.btnAdminLogout.addEventListener('click', () => {
+        clearAdminToken();
+        this.isAdmin = false;
+        this.confirmDeleteId = null;
+        if (this.editingCardId) this.resetToCreateMode();
+        this.syncAdminUI();
+        this.showGalleryStatus('已退出管理员模式', false);
+      });
+    }
+
+    if (this.btnCancelEdit) {
+      this.btnCancelEdit.addEventListener('click', () => {
+        this.resetToCreateMode();
+        this.showStatus('');
+        this.renderLiveCard();
+      });
+    }
 
     if (this.tabCreate) {
       this.tabCreate.addEventListener('click', () => {
         this.mode = 'create';
         this.syncModeView();
+        this.syncAdminUI();
         this.renderLiveCard();
       });
     }
     if (this.tabGallery) {
       this.tabGallery.addEventListener('click', () => {
         this.mode = 'gallery';
+        this.confirmDeleteId = null;
         this.syncModeView();
+        this.syncAdminUI();
         this.renderGallery();
       });
     }
@@ -597,6 +870,18 @@ export class WishCardStudio {
 
     if (this.galleryGrid) {
       this.galleryGrid.addEventListener('click', (e) => {
+        const adminBtn = e.target.closest('[data-admin-act]');
+        if (adminBtn) {
+          e.stopPropagation();
+          const act = adminBtn.dataset.adminAct;
+          const cardId = adminBtn.dataset.cardId;
+          const card = this.cards.find((c) => c.id === cardId);
+          if (act === 'pin') this.handleAdminPin(cardId, false);
+          else if (act === 'edit' && card) this.startEditCard(card);
+          else if (act === 'delete') this.handleAdminDelete(cardId, false);
+          return;
+        }
+
         const item = e.target.closest('.gallery-card-item');
         if (!item) return;
         const card = this.cards.find((c) => c.id === item.dataset.cardId);
@@ -604,10 +889,27 @@ export class WishCardStudio {
       });
     }
 
+    if (this.btnViewerPin) {
+      this.btnViewerPin.addEventListener('click', () => {
+        if (this.viewingCard) this.handleAdminPin(this.viewingCard.id, true);
+      });
+    }
+    if (this.btnViewerEdit) {
+      this.btnViewerEdit.addEventListener('click', () => {
+        if (this.viewingCard) this.startEditCard(this.viewingCard);
+      });
+    }
+    if (this.btnViewerDelete) {
+      this.btnViewerDelete.addEventListener('click', () => {
+        if (this.viewingCard) this.handleAdminDelete(this.viewingCard.id, true);
+      });
+    }
+
     if (this.btnViewerBack) {
       this.btnViewerBack.addEventListener('click', () => {
         this.mode = 'gallery';
         this.syncModeView();
+        this.syncAdminUI();
         this.renderGallery();
       });
     }
@@ -638,49 +940,60 @@ export class WishCardStudio {
 
     this.submitting = true;
     this.btnSubmit.disabled = true;
-    const origText = this.btnSubmit.textContent;
-    this.btnSubmit.textContent = '正在挂上圣诞树…';
-    this.showStatus('');
+    const payload = {
+      style: this.draft.style,
+      message,
+      signature,
+      stickers: this.draft.stickers.map(({ id, x, y, scale, rot }) => ({ id, x, y, scale, rot }))
+    };
 
     try {
-      const { card, syncedToCloud } = await submitWishCard({
-        style: this.draft.style,
-        message,
-        signature,
-        stickers: this.draft.stickers.map(({ id, x, y, scale, rot }) => ({ id, x, y, scale, rot }))
-      });
-
-      this.cards = [card, ...this.cards.filter((c) => c.id !== card.id)];
-      if (this.galleryCountBadge) {
-        this.galleryCountBadge.textContent = String(this.cards.length);
+      if (this.editingCardId) {
+        this.btnSubmit.textContent = '正在保存修改…';
+        const { cards } = await updateWishCard(this.editingCardId, payload);
+        this.setCards(cards);
+        if (this.onCardsMutated) this.onCardsMutated(cards);
+        this.resetToCreateMode();
+        this.mode = 'gallery';
+        this.syncModeView();
+        this.syncAdminUI();
+        this.renderGallery();
+        this.showGalleryStatus('✅ 修改已同步至云端并刷新圣诞树挂卡！', false);
+        return;
       }
 
-      // Reset inputs for next wish while keeping style preference
-      this.draft.message = '';
-      this.draft.signature = '';
-      if (this.inputMessage) this.inputMessage.value = '';
-      if (this.inputSignature) this.inputSignature.value = '';
-      if (this.charCountEl) this.charCountEl.textContent = '0 / 280';
+      this.btnSubmit.textContent = '正在挂上圣诞树…';
+      this.showStatus('');
+      const { card, cards, syncedToCloud } = await submitWishCard(payload);
+      const nextCards = Array.isArray(cards) && cards.length > 0
+        ? cards
+        : [card, ...this.cards.filter((c) => c.id !== card.id && !String(c.id).startsWith('seed-'))];
+
+      this.setCards(nextCards);
+      this.resetToCreateMode();
 
       const okMsg = syncedToCloud
         ? '✨ 贺卡已同步至云端并挂上 Yuan 的圣诞树！'
-        : '✨ 贺卡已挂上 Yuan 的圣诞树！（当前为本地演示模式）';
+        : '✨ 贺卡已挂上 Yuan 的圣诞树！';
       this.showStatus(okMsg, false);
 
       if (this.onCardSubmitted) {
-        this.onCardSubmitted(card);
+        this.onCardSubmitted(card, nextCards);
       }
 
-      // Briefly celebrate then close modal so sender sees their glowing card appear right on the 3D tree!
       setTimeout(() => {
         this.close();
       }, 880);
     } catch (err) {
-      this.showStatus(err.message || '发送失败，请稍后重试', true);
+      if (!getAdminToken() && this.editingCardId) {
+        this.isAdmin = false;
+        this.syncAdminUI();
+      }
+      this.showStatus(err.message || '操作失败，请稍后重试', true);
     } finally {
       this.submitting = false;
       this.btnSubmit.disabled = false;
-      this.btnSubmit.textContent = origText;
+      this.syncAdminUI();
     }
   }
 }

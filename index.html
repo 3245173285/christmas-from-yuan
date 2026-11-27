@@ -207,7 +207,13 @@
               🎄 树上的贺卡 <span id="studio-gallery-count" class="ws-count">0</span>
             </button>
           </div>
-          <button id="btn-close-studio" class="ws-close-icon" type="button" aria-label="关闭贺卡工坊">✕</button>
+          <div class="ws-header-right">
+            <div id="admin-mode-bar" class="ws-admin-pill" hidden>
+              <span>👑 管理中</span>
+              <button id="btn-admin-logout" type="button" title="退出管理员模式">退出</button>
+            </div>
+            <button id="btn-close-studio" class="ws-close-icon" type="button" aria-label="关闭贺卡工坊">✕</button>
+          </div>
         </header>
 
         <!-- Pane 1: Card Creator & 3D Reflective Preview -->
@@ -272,15 +278,19 @@
 
             <div id="studio-status-msg" class="ws-status-msg" role="status"></div>
 
-            <button id="btn-submit-wish-card" class="ws-submit-btn" type="button">
-              🎄 送给 Yuan 并挂上圣诞树
-            </button>
+            <div class="ws-submit-row">
+              <button id="btn-cancel-edit-card" class="ws-secondary-btn" type="button" hidden>取消编辑</button>
+              <button id="btn-submit-wish-card" class="ws-submit-btn" type="button">
+                🎄 送给 Yuan 并挂上圣诞树
+              </button>
+            </div>
           </div>
         </div>
 
         <!-- Pane 2: All Cards Hung on Yuan's Tree -->
         <div id="studio-pane-gallery" class="ws-pane ws-pane-gallery" hidden>
           <p class="ws-gallery-tip">每一张贺卡都真实挂在 3D 圣诞树枝桠上，点击任意卡片即可 3D 倾斜赏光 ✨</p>
+          <div id="gallery-status-msg" class="ws-status-msg ws-gallery-status" role="status"></div>
           <div id="studio-gallery-grid" class="ws-gallery-grid"></div>
         </div>
 
@@ -291,12 +301,40 @@
             <div id="viewer-reflective-card" class="reflective-card" data-style="parchment"></div>
           </div>
           <p class="ws-tilt-hint">👆 滑动屏幕或移动鼠标，欣赏 3D 倾斜与材质专属反光</p>
+          <div id="viewer-status-msg" class="ws-status-msg" role="status"></div>
+          <div id="viewer-admin-actions" class="ws-viewer-admin-actions" hidden>
+            <button id="btn-viewer-pin" class="ws-admin-btn" type="button">📌 置顶到树正面</button>
+            <button id="btn-viewer-edit" class="ws-admin-btn" type="button">✏️ 编辑贺卡</button>
+            <button id="btn-viewer-delete" class="ws-admin-btn is-danger" type="button">🗑️ 删除贺卡</button>
+          </div>
           <div class="ws-viewer-actions">
             <button id="btn-viewer-back" class="ws-secondary-btn" type="button">🎄 查看全部树上贺卡</button>
             <button id="btn-viewer-write" class="ws-submit-btn is-compact" type="button">✉️ 我也要送一张</button>
           </div>
         </div>
       </section>
+    </div>
+
+    <!-- Secret Yuan Admin Unlock Modal (triggered by 5 taps on CHRISTMAS FROM YUAN title) -->
+    <div id="admin-unlock-modal" class="admin-unlock-modal" aria-hidden="true">
+      <form id="admin-unlock-form" class="admin-unlock-box" autocomplete="off">
+        <div class="au-badge">👑 YUAN ADMIN</div>
+        <h3 class="au-title">贺卡管理解锁</h3>
+        <p class="au-desc">输入管理员密码后，可修改、置顶或删除树上的云端贺卡。</p>
+        <input
+          id="admin-password-input"
+          class="ws-input au-input"
+          type="password"
+          inputmode="numeric"
+          placeholder="请输入管理密码"
+          autocomplete="off"
+        />
+        <div id="admin-unlock-error" class="ws-status-msg is-error"></div>
+        <div class="au-actions">
+          <button id="btn-admin-cancel" class="ws-secondary-btn" type="button">取消</button>
+          <button id="btn-admin-unlock" class="ws-submit-btn is-compact" type="submit">解锁管理</button>
+        </div>
+      </form>
     </div>
 
     <script type="module" src="/src/main.js"></script>

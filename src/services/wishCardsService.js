@@ -2,6 +2,7 @@ import { WISH_CARDS_API_URL } from '../config/cardsApi.js';
 import { CARD_STYLE_MAP, DEFAULT_SEED_CARDS } from '../data/wishCardsConfig.js';
 
 const LOCAL_STORAGE_KEY = 'christmas_from_yuan_wish_cards_v1';
+const ADMIN_TOKEN_KEY = 'christmas_from_yuan_admin_session_v1';
 
 function sanitizeCard(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -54,6 +55,56 @@ export function isCloudBackendEnabled() {
   return Boolean(WISH_CARDS_API_URL && WISH_CARDS_API_URL.trim().startsWith('http'));
 }
 
+export function getAdminToken() {
+  try {
+    return sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+export function setAdminToken(token) {
+  try {
+    if (token) {
+      sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    }
+  } catch (_) {
+    // ignore storage restriction
+  }
+}
+
+export function clearAdminToken() {
+  setAdminToken('');
+}
+
+export async function verifyAdminPassword(password) {
+  const pwd = String(password || '').trim();
+  if (!pwd) throw new Error('请输入管理密码');
+
+  if (!isCloudBackendEnabled()) {
+    throw new Error('尚未配置云端后端地址');
+  }
+
+  const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
+  const res = await fetch(`${base}/api/admin/verify`, {
+    method: 'POST',
+    mode: 'cors',
+    headers: {
+      Authorization: `Bearer ${pwd}`
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || '管理密码不正确');
+  }
+
+  setAdminToken(pwd);
+  return true;
+}
+
 export async function fetchWishCards() {
   const localCards = readLocalCards();
 
@@ -66,7 +117,6 @@ export async function fetchWishCards() {
         const remote = (Array.isArray(data.cards) ? data.cards : [])
           .map(sanitizeCard)
           .filter(Boolean);
-        // Merge seed cards only if cloud has fewer than 1 card so tree is always festive
         if (remote.length > 0) {
           writeLocalCards(remote);
           return remote;
@@ -78,7 +128,6 @@ export async function fetchWishCards() {
     }
   }
 
-  // Merge user local cards on top of starter cards without duplicates
   const merged = [...localCards];
   const seen = new Set(merged.map((c) => c.id));
   for (const seed of DEFAULT_SEED_CARDS) {
@@ -94,14 +143,19 @@ export async function submitWishCard(draft) {
   }
 
   let savedCard = clean;
+  let allCards = null;
   let syncedToCloud = false;
 
   if (isCloudBackendEnabled()) {
     const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
+    const headers = { 'Content-Type': 'application/json' };
+    const token = getAdminToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+
     const res = await fetch(`${base}/api/cards`, {
       method: 'POST',
       mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(clean)
     });
     if (!res.ok) {
@@ -109,15 +163,102 @@ export async function submitWishCard(draft) {
       throw new Error(errBody.error || '云端投递稍忙，请稍后再试');
     }
     const data = await res.json();
-    if (data.card) {
-      savedCard = sanitizeCard(data.card) || clean;
+    if (data.card) savedCard = sanitizeCard(data.card) || clean;
+    if (Array.isArray(data.cards)) {
+      allCards = data.cards.map(sanitizeCard).filter(Boolean);
     }
     syncedToCloud = true;
   }
 
-  // Always update local cache immediately for instant feedback
-  const existing = readLocalCards().filter((c) => c.id !== savedCard.id);
-  writeLocalCards([savedCard, ...existing]);
+  if (allCards) {
+    writeLocalCards(allCards);
+  } else {
+    const existing = readLocalCards().filter((c) => c.id !== savedCard.id);
+    writeLocalCards([savedCard, ...existing]);
+  }
 
-  return { card: savedCard, syncedToCloud };
+  return { card: savedCard, cards: allCards, syncedToCloud };
+}
+
+export async function updateWishCard(cardId, updates) {
+  const token = getAdminToken();
+  if (!token) throw new Error('请先解锁 Yuan 管理模式');
+
+  if (String(cardId).startsWith('seed-')) {
+    throw new Error('预设示例贺卡会在收到第一张真实贺卡后自动替换哦');
+  }
+
+  if (isCloudBackendEnabled()) {
+    const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
+    const res = await fetch(`${base}/api/cards/${encodeURIComponent(cardId)}`, {
+      method: 'PATCH',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(updates)
+    });
+    if (res.status === 401) {
+      clearAdminToken();
+      throw new Error('管理登录已失效，请重新验证密码');
+    }
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || '更新失败，请稍后重试');
+    }
+    const data = await res.json();
+    const cards = (Array.isArray(data.cards) ? data.cards : []).map(sanitizeCard).filter(Boolean);
+    writeLocalCards(cards);
+    return { card: sanitizeCard(data.card), cards };
+  }
+
+  const local = readLocalCards();
+  const idx = local.findIndex((c) => c.id === cardId);
+  if (idx === -1) throw new Error('未找到该贺卡');
+  const next = sanitizeCard({ ...local[idx], ...updates });
+  if (updates.pin) {
+    local.splice(idx, 1);
+    local.unshift(next);
+  } else {
+    local[idx] = next;
+  }
+  writeLocalCards(local);
+  return { card: next, cards: local };
+}
+
+export async function deleteWishCard(cardId) {
+  const token = getAdminToken();
+  if (!token) throw new Error('请先解锁 Yuan 管理模式');
+
+  if (String(cardId).startsWith('seed-')) {
+    throw new Error('预设示例贺卡无需删除，收到第一张真实贺卡后会自动消失');
+  }
+
+  if (isCloudBackendEnabled()) {
+    const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
+    const res = await fetch(`${base}/api/cards/${encodeURIComponent(cardId)}`, {
+      method: 'DELETE',
+      mode: 'cors',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (res.status === 401) {
+      clearAdminToken();
+      throw new Error('管理登录已失效，请重新验证密码');
+    }
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || '删除失败，请稍后重试');
+    }
+    const data = await res.json();
+    const cards = (Array.isArray(data.cards) ? data.cards : []).map(sanitizeCard).filter(Boolean);
+    writeLocalCards(cards);
+    return { deletedId: cardId, cards: cards.length > 0 ? cards : [...DEFAULT_SEED_CARDS] };
+  }
+
+  const local = readLocalCards().filter((c) => c.id !== cardId);
+  writeLocalCards(local);
+  return { deletedId: cardId, cards: local.length > 0 ? local : [...DEFAULT_SEED_CARDS] };
 }

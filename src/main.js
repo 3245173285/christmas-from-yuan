@@ -94,10 +94,16 @@ function initNordicChristmas() {
   const audioEngine = new NordicAudioEngine();
   const giftCardModal = new GiftCardModal();
   const wishCardStudio = new WishCardStudio({
-    onCardSubmitted: (card) => {
+    onCardSubmitted: (card, allCards) => {
+      if (Array.isArray(allCards) && allCards.length > 0) {
+        christmasTree.syncWishCards(allCards);
+      }
       const worldPos = christmasTree.hangNewWishCard(card);
       magicParticles.emitGiftBurst(worldPos);
       audioEngine.playGiftOpen();
+    },
+    onCardsMutated: (cards) => {
+      christmasTree.syncWishCards(cards);
     }
   });
 
@@ -105,6 +111,26 @@ function initNordicChristmas() {
   if (btnOpenStudio) {
     btnOpenStudio.addEventListener('click', () => {
       wishCardStudio.openCreate();
+    });
+  }
+
+  // Secret Yuan Admin Door: tap/click the top "CHRISTMAS FROM YUAN" title 5 times within 2.5s!
+  const heroTitleEl = document.querySelector('.hero-title');
+  if (heroTitleEl) {
+    let tapCount = 0;
+    let tapTimer = null;
+    heroTitleEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      tapCount++;
+      clearTimeout(tapTimer);
+      if (tapCount >= 5) {
+        tapCount = 0;
+        wishCardStudio.openAdminUnlock();
+      } else {
+        tapTimer = setTimeout(() => {
+          tapCount = 0;
+        }, 2500);
+      }
     });
   }
 
