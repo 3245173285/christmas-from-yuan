@@ -497,10 +497,18 @@ export class FrostIntro {
 
   startLoop() {
     let prev = performance.now();
+    const frameIntervalMs = 1000 / 60;
     const tick = (now) => {
       if (!this.active) return;
-      const dt = Math.min((now - prev) / 1000, 0.05);
-      prev = now;
+      this.rafId = requestAnimationFrame(tick);
+      if (document.hidden) {
+        prev = now;
+        return;
+      }
+      const elapsedMs = now - prev;
+      if (elapsedMs < frameIntervalMs - 0.6) return;
+      const dt = Math.min(elapsedMs / 1000, 0.05);
+      prev = now - (elapsedMs % frameIntervalMs);
 
       // Smooth full-screen gentle fade + thaw dissolve when >= 40% wiped or Enter button clicked!
       if (this.melting) {
@@ -513,6 +521,7 @@ export class FrostIntro {
           this.active = false;
           this.root.classList.add('is-gone');
           window.removeEventListener('resize', this._onResize);
+          cancelAnimationFrame(this.rafId);
           return;
         }
       }
@@ -561,8 +570,6 @@ export class FrostIntro {
         ctx.arc(sp.x, sp.y, sp.size * sp.life, 0, Math.PI * 2);
         ctx.fill();
       }
-
-      this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
   }

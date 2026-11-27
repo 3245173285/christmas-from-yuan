@@ -512,3 +512,206 @@ export function createVelvetNormalBump(size = 128) {
   tex.repeat.set(4, 4);
   return tex;
 }
+
+// Cached Seamless 4-Channel Pre-Baked Noise LUT Texture (replaces 20-30 per-pixel FBM loops in Sky, Aurora & Water!)
+// R: Smooth low-freq noise | G: 4-octave smooth FBM | B: 3-octave mid FBM | A: High-freq detail noise
+let _sharedNoiseLUT = null;
+export function getSharedNoiseLUTTexture(size = 256) {
+  if (_sharedNoiseLUT) return _sharedNoiseLUT;
+
+  const data = new Uint8Array(size * size * 4);
+  const hash = (ix, iy, period, seed) => {
+    const wx = ((ix % period) + period) % period;
+    const wy = ((iy % period) + period) % period;
+    const n = Math.sin(wx * 127.1 + wy * 311.7 + seed * 74.7) * 43758.5453123;
+    return n - Math.floor(n);
+  };
+
+  const tileNoise = (u, v, freq, seed) => {
+    const x = u * freq;
+    const y = v * freq;
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const fx = x - ix;
+    const fy = y - iy;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const a = hash(ix, iy, freq, seed);
+    const b = hash(ix + 1, iy, freq, seed);
+    const c = hash(ix, iy + 1, freq, seed);
+    const d = hash(ix + 1, iy + 1, freq, seed);
+    return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
+  };
+
+  const tileFbm = (u, v, baseFreq, octaves, seed) => {
+    let sum = 0;
+    let amp = 0.5;
+    let norm = 0;
+    let f = baseFreq;
+    for (let o = 0; o < octaves; o++) {
+      sum += amp * tileNoise(u, v, f, seed + o * 17.3);
+      norm += amp;
+      f *= 2;
+      amp *= 0.5;
+    }
+    return sum / norm;
+  };
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const r = tileNoise(u, v, 4, 3.1);
+      const g = tileFbm(u, v, 4, 4, 19.7);
+      const b = tileFbm(u, v, 8, 3, 47.3);
+      const a = tileNoise(u, v, 20, 83.9);
+
+      const idx = (y * size + x) * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r * 255)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g * 255)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b * 255)));
+      data[idx + 3] = Math.min(255, Math.max(0, Math.round(a * 255)));
+    }
+  }
+
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  _sharedNoiseLUT = tex;
+  return tex;
+}
+
+// Pre-Baked Seamless Panoramic Distant Nordic Spruce Treeline Strip Texture (1024x256)
+// Paints 3 overlapping depth layers of dense Scandinavian conifers so distant mountain foothills look lush at ~0 GPU cost!
+export function createPanoramicTreelineTexture(width = 1024, height = 256) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+
+  let seed = 884217;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+
+  // Helper to paint one realistic Norway spruce at wrapped x (draws wrap copies near edges for seamless tiling!)
+  const paintSpruce = (cx, baseY, treeH, maxW, depthLayer) => {
+    const drawAt = (ox) => {
+      const tipY = baseY - treeH;
+
+      // Subtle trunk
+      ctx.strokeStyle = depthLayer === 0 ? '#121918' : '#211c17';
+      ctx.lineWidth = Math.max(1.5, maxW * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(ox, baseY);
+      ctx.lineTo(ox, tipY + treeH * 0.25);
+      ctx.stroke();
+
+      const tiers = depthLayer === 2 ? 12 : 10;
+      for (let t = 0; t < tiers; t++) {
+        const frac = t / (tiers - 1); // 0 = top, 1 = bottom
+        const y = tipY + frac * treeH * 0.92;
+        const w = maxW * (0.14 + Math.pow(frac, 0.86) * 0.92);
+        const droop = treeH * (0.04 + frac * 0.075);
+
+        const hue = 148 + (rand() - 0.5) * 16;
+        const sat = depthLayer === 0 ? 22 : depthLayer === 1 ? 30 : 34;
+        const lum = (depthLayer === 0 ? 11 : depthLayer === 1 ? 16 : 21) + (1 - frac) * 5;
+        ctx.fillStyle = `hsl(${hue}, ${sat}%, ${lum}%)`;
+
+        // Feathered drooping conifer bough tier
+        ctx.beginPath();
+        ctx.moveTo(ox, y - droop * 0.6);
+        ctx.quadraticCurveTo(ox + w * 0.52, y + droop * 0.2, ox + w, y + droop);
+        ctx.quadraticCurveTo(ox + w * 0.45, y + droop * 1.15, ox, y + droop * 0.72);
+        ctx.quadraticCurveTo(ox - w * 0.45, y + droop * 1.15, ox - w, y + droop);
+        ctx.quadraticCurveTo(ox - w * 0.52, y + droop * 0.2, ox, y - droop * 0.6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Delicate pine branch notches & snow highlight on upper front boughs
+        if (depthLayer >= 1 && frac < 0.75) {
+          ctx.fillStyle = `rgba(182, 206, 224, ${depthLayer === 2 ? 0.2 : 0.12})`;
+          ctx.beginPath();
+          ctx.moveTo(ox, y - droop * 0.5);
+          ctx.lineTo(ox + w * 0.72, y + droop * 0.42);
+          ctx.lineTo(ox, y + droop * 0.2);
+          ctx.lineTo(ox - w * 0.72, y + droop * 0.42);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      // Crisp pointed spruce leader tip
+      ctx.strokeStyle = depthLayer === 0 ? '#173026' : '#254a39';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(ox, tipY - 4);
+      ctx.lineTo(ox, tipY + treeH * 0.14);
+      ctx.stroke();
+    };
+
+    drawAt(cx);
+    if (cx < maxW * 1.4) drawAt(cx + width);
+    if (cx > width - maxW * 1.4) drawAt(cx - width);
+  };
+
+  // Layer 0 (deep dense forest backdrop sealing gaps)
+  const backCount = 34;
+  for (let i = 0; i < backCount; i++) {
+    const cx = ((i + rand() * 0.75) / backCount) * width;
+    const h = height * (0.58 + rand() * 0.34);
+    const w = 22 + rand() * 14;
+    paintSpruce(cx, height + 8, h, w, 0);
+  }
+
+  // Layer 1 (mid lush overlapping conifers)
+  const midCount = 30;
+  for (let i = 0; i < midCount; i++) {
+    const cx = ((i + rand() * 0.8) / midCount) * width;
+    const h = height * (0.48 + rand() * 0.42);
+    const w = 24 + rand() * 16;
+    paintSpruce(cx, height + 10, h, w, 1);
+  }
+
+  // Layer 2 (foreground crisp spruce silhouettes)
+  const frontCount = 24;
+  for (let i = 0; i < frontCount; i++) {
+    const cx = ((i + rand() * 0.85) / frontCount) * width;
+    const h = height * (0.42 + rand() * 0.45);
+    const w = 24 + rand() * 15;
+    paintSpruce(cx, height + 12, h, w, 2);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Pre-Baked Soft Radial Contact Shadow Disc (for underneath Hero Christmas Tree & Gifts)
+export function createTreeContactShadowTexture(size = 256) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const c = size / 2;
+  const grad = ctx.createRadialGradient(c, c, size * 0.04, c, c, c);
+  grad.addColorStop(0.0, 'rgba(6, 12, 24, 0.56)');
+  grad.addColorStop(0.36, 'rgba(8, 16, 30, 0.38)');
+  grad.addColorStop(0.68, 'rgba(10, 18, 34, 0.16)');
+  grad.addColorStop(1.0, 'rgba(10, 18, 34, 0.0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}

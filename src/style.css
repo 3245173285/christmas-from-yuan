@@ -656,14 +656,15 @@ body {
     padding: 12px 14px 11px;
     border-radius: 26px;
     gap: 10px;
-    backdrop-filter: blur(16px) saturate(165%) brightness(1.05);
-    -webkit-backdrop-filter: blur(16px) saturate(165%) brightness(1.05);
+    background: linear-gradient(155deg, rgba(22, 34, 54, 0.56) 0%, rgba(10, 18, 32, 0.64) 100%);
+    backdrop-filter: blur(10px) saturate(145%) brightness(1.04);
+    -webkit-backdrop-filter: blur(10px) saturate(145%) brightness(1.04);
   }
   .liquid-enter-btn {
     padding: 12px 26px;
     font-size: 0.86rem;
-    backdrop-filter: blur(16px) saturate(160%);
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(10px) saturate(145%);
+    -webkit-backdrop-filter: blur(10px) saturate(145%);
   }
   .timeline-row {
     gap: 10px;

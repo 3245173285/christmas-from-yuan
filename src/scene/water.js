@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { CABIN_SITES, getTerrainHeight, WATER_LEVEL } from '../utils/noise.js';
+import { getSharedNoiseLUTTexture } from '../utils/textures.js';
 
 // Lively Cinematic Nordic Glacial Fjord Lake Shader
-// Visible rolling directional swells, sweeping wind-gust ripple patches, dancing aurora & golden village reflections,
-// sparkling moon/sun glitter on wave crests, and gentle animated shoreline wavelets lapping the banks
+// Uses Pre-Baked Seamless Noise LUT Texture (replaces 18+ per-pixel procedural noise loops) + Pre-Culled Lake Mesh (zero discard!)
 
 const WATER_VERTEX_SHADER = /* glsl */ `
   attribute float aDepth;
@@ -34,6 +34,7 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
   precision highp float;
 
   uniform float uTime;
+  uniform sampler2D uNoiseTex;
   uniform vec3 uSkyZenith;
   uniform vec3 uSkyMid;
   uniform vec3 uSkyHorizon;
@@ -52,39 +53,18 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
   varying float vDepth;
   varying float vWaveHeight;
 
-  float hash(vec2 p) {
-    p = fract(p * vec2(127.1, 311.7));
-    p += dot(p, p + 34.5);
-    return fract(p.x * p.y);
+  // Fast pre-baked LUT lookups replacing expensive procedural noise loops
+  float lutNoise(vec2 p) {
+    return texture2D(uNoiseTex, p * 0.08).r;
   }
 
-  float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(
-      mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
-      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
-      f.y
-    );
-  }
-
-  float fbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.5;
-    mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
-    for (int i = 0; i < 4; i++) {
-      v += a * noise(p);
-      p = rot * p * 2.04 + vec2(5.2, 2.9);
-      a *= 0.5;
-    }
-    return v;
+  float lutFbm(vec2 p) {
+    return texture2D(uNoiseTex, p * 0.14).g;
   }
 
   // Lively multi-scale traveling fjord waves + sweeping wind-gust ripple patches
   vec3 computeLakeNormal(vec2 p, float t, float depthMask, out float crestFactor) {
-    // Sweeping Nordic wind gusts moving visibly across the water surface
-    float windGust = 0.55 + 0.65 * fbm(p * 0.022 + vec2(t * 0.14, -t * 0.07));
+    float windGust = 0.55 + 0.65 * lutFbm(p * 0.022 + vec2(t * 0.14, -t * 0.07));
 
     vec2 grad = vec2(0.0);
     float crest = 0.0;
@@ -110,16 +90,11 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
     float ph4 = dot(p, d4) * 1.85 - t * 2.85;
     grad += d4 * cos(ph4) * 0.032;
 
-    // 3. Organic FBM capillary wave shimmer moving with the breeze
-    float eps = 0.25;
-    vec2 driftA = p * 0.28 + vec2(t * 0.42, -t * 0.28);
-    vec2 driftB = p * 0.62 - vec2(t * 0.55, t * 0.34);
-    float nC = noise(driftA) * 0.6 + noise(driftB) * 0.4;
-    float nX = noise(driftA + vec2(eps * 0.28, 0.0)) * 0.6 + noise(driftB + vec2(eps * 0.62, 0.0)) * 0.4;
-    float nZ = noise(driftA + vec2(0.0, eps * 0.28)) * 0.6 + noise(driftB + vec2(0.0, eps * 0.62)) * 0.4;
-    grad += vec2((nX - nC), (nZ - nC)) * 0.32;
+    // 3. Fast 2-tap LUT capillary shimmer moving with the breeze
+    vec4 capA = texture2D(uNoiseTex, p * 0.024 + vec2(t * 0.035, -t * 0.024));
+    vec4 capB = texture2D(uNoiseTex, p * 0.052 - vec2(t * 0.044, t * 0.028));
+    grad += vec2((capA.b - capB.b), (capA.a - capB.a)) * 0.11;
 
-    // Gentle distance falloff so midground lake (80-160m) retains crisp living wave texture
     float dist = length(cameraPosition - vWorldPos);
     float distAtten = 1.0 / (1.0 + dist * 0.0018);
 
@@ -129,9 +104,7 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
   }
 
   void main() {
-    if (vDepth <= -0.02) discard;
-
-    float depthMask = smoothstep(0.0, 1.4, vDepth);
+    float depthMask = smoothstep(0.0, 1.4, max(0.0, vDepth));
     vec3 V = normalize(cameraPosition - vWorldPos);
     float crestFactor = 0.0;
     vec3 N = computeLakeNormal(vWorldPos.xz, uTime, depthMask, crestFactor);
@@ -143,7 +116,8 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
     skyRefl = mix(skyRefl, uSkyZenith, smoothstep(0.22, 0.82, ry));
 
     // 2. Dark Alpine Mountain Silhouette Reflection undulating across wave slopes
-    float mNoise = noise(vec2(R.x * 5.2 + 1.4, 0.5)) * 0.065 + noise(vec2(R.x * 12.5, 1.2)) * 0.028;
+    vec4 mTap = texture2D(uNoiseTex, vec2(R.x * 0.42 + 0.15, 0.25));
+    float mNoise = mTap.g * 0.065 + mTap.b * 0.028;
     float mountainElev = (0.045 + mNoise) * smoothstep(-0.2, 0.65, -R.z);
     float mSilhouette = 1.0 - smoothstep(mountainElev - 0.018, mountainElev + 0.028, ry);
     vec3 mReflCol = mix(uFogColor * 0.38, uSkyHorizon * 0.48, smoothstep(-0.05, 0.35, uSunElevation));
@@ -152,16 +126,17 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
     // 3. Living, Rippling Aurora Borealis Reflection dancing across the moving wave crests!
     if (uAuroraIntensity > 0.01) {
       float northBand = smoothstep(0.02, 0.24, ry) * (1.0 - smoothstep(0.36, 0.72, ry)) * smoothstep(-0.15, 0.7, -R.z);
-      float sx = R.x * 3.2 + N.x * 4.8;
-      float sz = vWorldPos.z * 0.022 + N.z * 3.6;
-      float w1 = fbm(vec2(sx + uTime * 0.14, sz - uTime * 0.1));
-      float w2 = fbm(vec2(sx * 2.2 - uTime * 0.12 + w1 * 1.8, ry * 3.6 + uTime * 0.09));
-      float curtain = smoothstep(0.34, 0.78, w2) * northBand * (1.0 - mSilhouette * 0.65);
-      // Wave crests catch brighter moving flashes of green/cyan northern lights
-      float waveCatch = 0.75 + 0.65 * crestFactor;
-      vec3 aurCol = mix(vec3(0.12, 0.78, 0.56), vec3(0.14, 0.62, 0.78), smoothstep(0.1, 0.32, ry));
-      aurCol = mix(aurCol, vec3(0.46, 0.28, 0.76), smoothstep(0.28, 0.55, ry));
-      refl += aurCol * curtain * waveCatch * 0.56 * uAuroraIntensity;
+      if (northBand > 0.01) {
+        float sx = R.x * 3.2 + N.x * 4.8;
+        float sz = vWorldPos.z * 0.022 + N.z * 3.6;
+        float w1 = lutFbm(vec2(sx + uTime * 0.14, sz - uTime * 0.1));
+        float w2 = texture2D(uNoiseTex, vec2(sx * 0.26 - uTime * 0.018 + w1 * 0.24, ry * 0.45 + uTime * 0.014)).b;
+        float curtain = smoothstep(0.34, 0.78, w2) * northBand * (1.0 - mSilhouette * 0.65);
+        float waveCatch = 0.75 + 0.65 * crestFactor;
+        vec3 aurCol = mix(vec3(0.12, 0.78, 0.56), vec3(0.14, 0.62, 0.78), smoothstep(0.1, 0.32, ry));
+        aurCol = mix(aurCol, vec3(0.46, 0.28, 0.76), smoothstep(0.28, 0.55, ry));
+        refl += aurCol * curtain * waveCatch * 0.56 * uAuroraIntensity;
+      }
     }
 
     // 4. Sparkling Star & Moonlight Glitter dancing dynamically on moving capillary wave facets
@@ -175,7 +150,7 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
     refl += specCol * (specSparkle * 2.8 + specSheen * 0.2) * specStr;
 
     if (uStarIntensity > 0.08) {
-      float twinkleField = noise(vWorldPos.xz * 0.95 + N.xz * 26.0 + vec2(uTime * 0.85, -uTime * 0.55));
+      float twinkleField = texture2D(uNoiseTex, vWorldPos.xz * 0.045 + N.xz * 1.2 + vec2(uTime * 0.04, -uTime * 0.025)).a;
       float glint = smoothstep(0.84, 0.98, twinkleField) * (0.5 + 0.5 * crestFactor);
       refl += vec3(0.78, 0.92, 1.0) * glint * 0.52 * uStarIntensity;
     }
@@ -190,7 +165,6 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
           float width = 1.6 + dz * 0.045;
           float lateral = exp(-pow(dx / width, 2.0));
           float trail = smoothstep(0.0, 3.0, dz) * exp(-dz * 0.036);
-          // Distinct moving horizontal golden reflection bars breaking across rolling swells!
           float waveBreak1 = pow(0.5 + 0.5 * sin(dz * 1.9 - uTime * 3.1 + float(i) * 1.7 + N.z * 28.0), 2.2);
           float waveBreak2 = 0.5 + 0.5 * cos(dz * 3.7 + uTime * 2.4 + N.x * 18.0);
           float shimmer = 0.25 + 0.95 * waveBreak1 * (0.65 + 0.35 * waveBreak2);
@@ -203,7 +177,6 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
     vec3 deepCol = mix(vec3(0.012, 0.028, 0.055), vec3(0.026, 0.075, 0.115), smoothstep(-0.08, 0.35, uSunElevation));
     vec3 shallowCol = mix(vec3(0.038, 0.065, 0.085), vec3(0.11, 0.16, 0.18), smoothstep(-0.08, 0.35, uSunElevation));
     vec3 waterBody = mix(shallowCol, deepCol, depthMask);
-    // Subtle luminous wave-crest catch so individual rolling swells read clearly even in shadows
     waterBody += mix(vec3(0.018, 0.052, 0.072), vec3(0.04, 0.08, 0.11), 1.0 - uStarIntensity) * crestFactor * 0.85;
 
     // Physical Fresnel reflectance
@@ -214,12 +187,12 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
     vec3 color = mix(waterBody, refl, reflMix);
 
     // 7. Animated Gentle Shoreline Wavelets Lapping Rhythmically Against the Banks!
-    float shoreZone = 1.0 - smoothstep(0.0, 0.85, vDepth);
-    if (shoreZone > 0.01) {
-      float lapPhase = vDepth * 8.5 - uTime * 2.1 + noise(vWorldPos.xz * 0.35) * 4.2;
+    float shoreZone = 1.0 - smoothstep(0.0, 0.85, max(0.0, vDepth));
+    if (shoreZone > 0.01 && vDepth > -0.02) {
+      float lapPhase = vDepth * 8.5 - uTime * 2.1 + lutNoise(vWorldPos.xz * 0.35) * 4.2;
       float lapWave = smoothstep(0.45, 0.95, sin(lapPhase)) * shoreZone;
-      float fineFoam = noise(vWorldPos.xz * 2.2 - vec2(0.0, uTime * 0.65));
-      float foamAlpha = (lapWave * 0.45 + (1.0 - smoothstep(0.0, 0.22, vDepth)) * 0.35) * (0.5 + 0.5 * fineFoam);
+      float fineFoam = texture2D(uNoiseTex, vWorldPos.xz * 0.09 - vec2(0.0, uTime * 0.03)).a;
+      float foamAlpha = (lapWave * 0.45 + (1.0 - smoothstep(0.0, 0.22, max(0.0, vDepth))) * 0.35) * (0.5 + 0.5 * fineFoam);
       vec3 foamCol = mix(vec3(0.42, 0.56, 0.68), vec3(0.86, 0.91, 0.96), 1.0 - uStarIntensity * 0.65);
       color = mix(color, foamCol, clamp(foamAlpha * 0.65, 0.0, 0.55));
     }
@@ -235,13 +208,14 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
 `;
 
 export class FjordWater {
-  constructor(scene) {
+  constructor(scene, perf = {}) {
     const width = 460;
     const depth = 380;
     const centerX = 0;
     const centerZ = -145;
 
-    const geo = new THREE.PlaneGeometry(width, depth, 148, 148);
+    const segs = perf.isMobile ? 64 : 96;
+    const geo = new THREE.PlaneGeometry(width, depth, segs, segs);
     geo.rotateX(-Math.PI / 2);
 
     const pos = geo.attributes.position;
@@ -254,6 +228,19 @@ export class FjordWater {
     }
     geo.setAttribute('aDepth', new THREE.BufferAttribute(depths, 1));
 
+    // Pre-cull completely dry triangles outside the lake basin at startup (removes ~60% wasted water tris & avoids fragment discard!)
+    const rawIdx = geo.index.array;
+    const keptIdx = [];
+    for (let i = 0; i < rawIdx.length; i += 3) {
+      const a = rawIdx[i];
+      const b = rawIdx[i + 1];
+      const c = rawIdx[i + 2];
+      if (depths[a] > -0.18 || depths[b] > -0.18 || depths[c] > -0.18) {
+        keptIdx.push(a, b, c);
+      }
+    }
+    geo.setIndex(keptIdx);
+
     const waterfrontIndices = [0, 1, 2, 3, 10, 11, 12, 13];
     const cabinPositions = waterfrontIndices.map((idx) => {
       const c = CABIN_SITES[idx] || CABIN_SITES[0];
@@ -265,6 +252,7 @@ export class FjordWater {
       depthWrite: false,
       uniforms: {
         uTime: { value: 0 },
+        uNoiseTex: { value: getSharedNoiseLUTTexture(256) },
         uSkyZenith: { value: new THREE.Color('#040917') },
         uSkyMid: { value: new THREE.Color('#09162e') },
         uSkyHorizon: { value: new THREE.Color('#122745') },

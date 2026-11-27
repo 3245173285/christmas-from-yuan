@@ -25,9 +25,9 @@ function initNordicChristmas() {
   const container = document.getElementById('canvas-container');
   const perf = detectPerformanceProfile();
 
-  // 1. WebGL Renderer with ACES Filmic Tone Mapping & Soft Shadows
+  // 1. WebGL Renderer with ACES Filmic Tone Mapping & Crisp Antialiasing
   const renderer = new THREE.WebGLRenderer({
-    antialias: !perf.isMobile,
+    antialias: perf.antialias !== false,
     powerPreference: 'high-performance'
   });
   renderer.setPixelRatio(perf.pixelRatio);
@@ -35,9 +35,10 @@ function initNordicChristmas() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = perf.isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
-  if (perf.shadowThrottleFrames > 1) {
+  renderer.shadowMap.enabled = perf.useShadowMap !== false;
+  if (renderer.shadowMap.enabled) {
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // On-demand shadow baking: only updates when sun/moon angle shifts noticeably (0 updates when paused!)
     renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.needsUpdate = true;
   }
@@ -82,7 +83,7 @@ function initNordicChristmas() {
 
   const skyAndAurora = new SkyAndAurora(scene, perf);
   const terrain = new NordicTerrain(scene, perf);
-  const fjordWater = new FjordWater(scene);
+  const fjordWater = new FjordWater(scene, perf);
   const cabins = new NorwegianCabins(scene);
   const christmasTree = new LuxuryChristmasTree(scene, perf);
   const envDetails = new EnvironmentDetails(scene, perf);
@@ -111,8 +112,10 @@ function initNordicChristmas() {
 
   // Interactive Glacial-Ice Intro Overlay -> reveals Liquid Glass HUD smoothly upon >=40% wipe or Enter
   const hudRoot = document.getElementById('hud-root');
+  let introEnteredAt = -1;
   new FrostIntro({
     onEnter: () => {
+      introEnteredAt = performance.now();
       if (hudRoot) {
         setTimeout(() => {
           hudRoot.classList.remove('is-awaiting-intro');
@@ -139,30 +142,51 @@ function initNordicChristmas() {
     }
   });
 
-  // 6. Adaptive Runtime FPS Monitor (gracefully lowers DPR if sustained low FPS)
+  // 6. Locked 60 FPS Frame Pacer + Tab Visibility Pause + Post-Intro Adaptive DPR Safeguard
+  const targetFps = perf.targetFps || 60;
+  const frameIntervalMs = 1000 / targetFps;
+  let lastFrameNow = performance.now();
+  let isTabHidden = document.hidden;
+
   let fpsFrames = 0;
   let fpsAccum = 0;
   let adapted = false;
-  let frameCounter = 0;
 
-  // 7. Smooth Main Animation Loop
+  const lastShadowLightDir = new THREE.Vector3();
+  const curLightDir = new THREE.Vector3();
+  let hasBakedInitialShadow = false;
+
   const clock = new THREE.Clock();
 
-  function animate() {
+  document.addEventListener('visibilitychange', () => {
+    isTabHidden = document.hidden;
+    if (!isTabHidden) {
+      clock.getDelta(); // discard paused delta spike
+      lastFrameNow = performance.now();
+    }
+  });
+
+  // 7. Smooth 60 FPS Main Animation Loop
+  function animate(now) {
     requestAnimationFrame(animate);
+    if (isTabHidden) return;
+
+    const elapsedMs = now - lastFrameNow;
+    // Lock cleanly to 60 FPS (0.6ms tolerance keeps native 60Hz displays perfectly synchronized without skipping frames!)
+    if (elapsedMs < frameIntervalMs - 0.6) return;
+    lastFrameNow = now - (elapsedMs % frameIntervalMs);
 
     const dt = Math.min(clock.getDelta(), 0.1);
     const elapsed = clock.elapsedTime;
-    frameCounter++;
 
-    // Adaptive resolution safeguard during first ~3.5 seconds
-    if (!adapted) {
+    // Post-intro adaptive DPR safeguard (only measures AFTER ice intro exits + 2s shader warmup so phones never get locked into low-res!)
+    if (!adapted && introEnteredAt > 0 && now - introEnteredAt > 2000) {
       fpsFrames++;
       fpsAccum += dt;
       if (fpsAccum >= 3.0) {
         const avgFps = fpsFrames / fpsAccum;
-        if (avgFps < 26) {
-          const targetDpr = perf.isMobile ? 0.88 : 1.0;
+        if (avgFps < 28) {
+          const targetDpr = perf.minAdaptiveDpr || 1.1;
           if (renderer.getPixelRatio() > targetDpr) {
             renderer.setPixelRatio(targetDpr);
             if (composer) composer.setPixelRatio(targetDpr);
@@ -174,9 +198,14 @@ function initNordicChristmas() {
 
     const dayState = dayNight.update(dt);
 
-    // Throttled directional shadow map baking on mobile (reduces shadow GPU work by ~80%)
-    if (perf.shadowThrottleFrames > 1 && frameCounter % perf.shadowThrottleFrames === 0) {
-      renderer.shadowMap.needsUpdate = true;
+    // On-demand directional shadow baking: only re-render shadow map when sun/moon direction moves > ~0.4 degrees
+    if (renderer.shadowMap.enabled) {
+      curLightDir.copy(dayNight.keyLight.position).normalize();
+      if (!hasBakedInitialShadow || curLightDir.distanceToSquared(lastShadowLightDir) > 0.00005) {
+        lastShadowLightDir.copy(curLightDir);
+        renderer.shadowMap.needsUpdate = true;
+        hasBakedInitialShadow = true;
+      }
     }
 
     // Modulate bloom smoothly on desktop
@@ -202,7 +231,7 @@ function initNordicChristmas() {
     }
   }
 
-  animate();
+  requestAnimationFrame(animate);
 }
 
 initNordicChristmas();

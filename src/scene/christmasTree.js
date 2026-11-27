@@ -6,6 +6,7 @@ import {
   createBarkTexture,
   createPineSprigTexture,
   createSoftGlowTexture,
+  createTreeContactShadowTexture,
   createVelvetNormalBump
 } from '../utils/textures.js';
 
@@ -13,10 +14,12 @@ import {
 // Layered spruce boughs + instanced 3D pine needle fronds + PBR ornaments with pendulum sway
 // + helical gold silk ribbon + dense twinkling warm fairy lights + 3D gold star + bespoke luxury gift boxes
 
-function createCrossedSprigGeometry() {
-  // Two slightly arched, intersecting sprig planes so pine fronds look lush and 3D from any angle
-  const geo1 = new THREE.PlaneGeometry(0.62, 0.88, 2, 3);
-  const geo2 = new THREE.PlaneGeometry(0.56, 0.84, 2, 3);
+function createCrossedSprigGeometry(isMobile = false) {
+  // Lightweight crossed arched sprig planes (1x1 on mobile = 4 tris, 1x2 on desktop = 8 tris; 66%-83% fewer tris than 2x3!)
+  const segX = 1;
+  const segY = isMobile ? 1 : 2;
+  const geo1 = new THREE.PlaneGeometry(0.64, 0.9, segX, segY);
+  const geo2 = new THREE.PlaneGeometry(0.58, 0.86, segX, segY);
 
   // Pivot near base of sprig so it radiates outward from the bough
   geo1.translate(0, 0.36, 0);
@@ -246,10 +249,27 @@ export class LuxuryChristmasTree {
     boughInst.instanceMatrix.needsUpdate = true;
     boughInst.castShadow = true;
     this.group.add(boughInst);
+
+    // Pre-Baked Soft Radial Contact Shadow Disc beneath the tree & gifts (grounds tree naturally with zero per-frame shadow cost!)
+    const contactShadowTex = createTreeContactShadowTexture(256);
+    const contactShadowGeo = new THREE.PlaneGeometry(14.5, 14.5);
+    contactShadowGeo.rotateX(-Math.PI / 2);
+    const contactShadowMat = new THREE.MeshBasicMaterial({
+      map: contactShadowTex,
+      transparent: true,
+      opacity: this.perf.isMobile ? 0.92 : 0.62,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1
+    });
+    const contactShadow = new THREE.Mesh(contactShadowGeo, contactShadowMat);
+    contactShadow.position.y = 0.06;
+    contactShadow.renderOrder = 2;
+    this.group.add(contactShadow);
   }
 
   buildPineNeedles(targetCount, scaleBoost = 1.0, castShadow = true) {
-    const sprigGeo = createCrossedSprigGeometry();
+    const sprigGeo = createCrossedSprigGeometry(this.perf.isMobile);
     const sprigTex = createPineSprigTexture(256);
 
     const needleMat = new THREE.MeshStandardMaterial({
@@ -421,28 +441,30 @@ export class LuxuryChristmasTree {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    this.ribbonMat = new THREE.MeshPhysicalMaterial({
+    const isMob = Boolean(this.perf.isMobile);
+    const RibbonMatCtor = isMob ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
+    this.ribbonMat = new RibbonMatCtor({
       color: '#e8c474',
       emissive: new THREE.Color('#6b4b15'),
       emissiveIntensity: 0.28,
       metalness: 0.78,
       roughness: 0.26,
-      clearcoat: 0.45,
-      clearcoatRoughness: 0.25,
+      ...(isMob ? {} : { clearcoat: 0.45, clearcoatRoughness: 0.25 }),
       side: THREE.DoubleSide,
       envMapIntensity: 1.65
     });
 
     const ribbon = new THREE.Mesh(geo, this.ribbonMat);
-    ribbon.castShadow = true;
+    ribbon.castShadow = !isMob;
     this.group.add(ribbon);
   }
 
   buildLuxuryOrnaments() {
     // 4 bespoke luxury PBR finishes + spherical & teardrop finial geometries
-    const sphereGeo = new THREE.SphereGeometry(0.165, 20, 16);
+    const isMob = Boolean(this.perf.isMobile);
+    const sphereGeo = new THREE.SphereGeometry(0.165, isMob ? 12 : 18, isMob ? 10 : 14);
     const finialGeo = createTeardropFinialGeometry();
-    const capGeo = new THREE.CylinderGeometry(0.036, 0.042, 0.06, 10);
+    const capGeo = new THREE.CylinderGeometry(0.036, 0.042, 0.06, isMob ? 6 : 10);
 
     const addPendulumSway = (mat) => {
       mat.onBeforeCompile = (shader) => {
@@ -465,36 +487,33 @@ export class LuxuryChristmasTree {
       };
     };
 
-    const matGold = new THREE.MeshPhysicalMaterial({
+    const OrnMatCtor = isMob ? THREE.MeshStandardMaterial : THREE.MeshPhysicalMaterial;
+    const matGold = new OrnMatCtor({
       color: '#ebd08a',
       metalness: 0.95,
       roughness: 0.14,
-      clearcoat: 0.75,
-      clearcoatRoughness: 0.08,
+      ...(isMob ? {} : { clearcoat: 0.75, clearcoatRoughness: 0.08 }),
       envMapIntensity: 1.9
     });
-    const matCrimson = new THREE.MeshPhysicalMaterial({
+    const matCrimson = new OrnMatCtor({
       color: '#911120',
-      metalness: 0.28,
-      roughness: 0.08,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.04,
+      metalness: isMob ? 0.42 : 0.28,
+      roughness: 0.1,
+      ...(isMob ? {} : { clearcoat: 1.0, clearcoatRoughness: 0.04 }),
       envMapIntensity: 2.0
     });
-    const matSilver = new THREE.MeshPhysicalMaterial({
+    const matSilver = new OrnMatCtor({
       color: '#e5edf7',
       metalness: 0.88,
       roughness: 0.18,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.1,
+      ...(isMob ? {} : { clearcoat: 0.8, clearcoatRoughness: 0.1 }),
       envMapIntensity: 1.85
     });
-    const matRose = new THREE.MeshPhysicalMaterial({
+    const matRose = new OrnMatCtor({
       color: '#d99e73',
       metalness: 0.9,
       roughness: 0.16,
-      clearcoat: 0.75,
-      clearcoatRoughness: 0.08,
+      ...(isMob ? {} : { clearcoat: 0.75, clearcoatRoughness: 0.08 }),
       envMapIntensity: 1.85
     });
     const capMat = new THREE.MeshStandardMaterial({
@@ -933,14 +952,11 @@ export class LuxuryChristmasTree {
         ribR.position.set(w * 0.5 + 0.006, h * 0.5, 0);
         bg.add(ribF, ribB, ribL, ribR);
 
-        // Populate interior with adorable 3D miniature gift (teddy bear / snow globe / drum / music box / snowman) + physical 3D vintage greeting card!
+        // Populate interior with adorable 3D miniature gift + physical 3D vintage greeting card!
+        // Hidden while box lid is closed (zero draw calls until hovered or opened!)
         interiorObj = createGiftInterior(specialIdx, w, h, d, cardData);
+        interiorObj.interior.visible = false;
         bg.add(interiorObj.interior);
-
-        // Soft warm magic interior showcase light (only illuminates when this box is open!)
-        innerLight = new THREE.PointLight('#ffdca0', 0, 4.5, 1.8);
-        innerLight.position.set(0, h * 1.15, 0.15);
-        bg.add(innerLight);
       } else {
         // Decorative closed luxury boxes
         const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wrapMat);
@@ -1193,17 +1209,26 @@ export class LuxuryChristmasTree {
 
   buildTreeLighting() {
     // Warm golden internal & perimeter lights bathing the grand tree, encircling gifts, and snowy meadow at night
-    this.treeGlowLower = new THREE.PointLight('#ffbe6e', 22, 34, 1.5);
-    this.treeGlowLower.position.set(0, 2.8, 3.8);
+    this.treeGlowLower = new THREE.PointLight('#ffbe6e', 22, 36, 1.5);
+    this.treeGlowLower.position.set(0, 3.0, 3.6);
     this.group.add(this.treeGlowLower);
 
-    this.treeGlowBack = new THREE.PointLight('#ffbe6e', 16, 28, 1.55);
-    this.treeGlowBack.position.set(0, 4.4, -3.6);
-    this.group.add(this.treeGlowBack);
+    if (!this.perf.isMobile) {
+      this.treeGlowBack = new THREE.PointLight('#ffbe6e', 16, 28, 1.55);
+      this.treeGlowBack.position.set(0, 4.4, -3.6);
+      this.group.add(this.treeGlowBack);
+    } else {
+      this.treeGlowBack = null;
+    }
 
     this.starLight = new THREE.PointLight('#ffd27d', 20, 32, 1.5);
     this.starLight.position.set(0, this.treeHeight + 0.5, 0.35);
     this.group.add(this.starLight);
+
+    // Single shared showcase PointLight repositioned into whichever mystery gift box is currently open!
+    // Replaces 10 individual per-gift PointLights -> cuts 9 per-pixel PBR light loops across the entire world!
+    this.activeGiftLight = new THREE.PointLight('#ffdca0', 0, 4.8, 1.8);
+    this.group.add(this.activeGiftLight);
   }
 
   update(elapsedTime, dt, dayState) {
@@ -1244,8 +1269,10 @@ export class LuxuryChristmasTree {
     this.ribbonMat.emissiveIntensity = 0.04 + lf * 0.32 + starBurstBoost * 0.35;
 
     // Warm festive light pool onto meadow & gifts
-    this.treeGlowLower.intensity = (lf * 17.5 + starBurstBoost * 12.0) * warmPulse;
-    this.treeGlowBack.intensity = (lf * 13.0 + starBurstBoost * 8.0) * warmPulse;
+    this.treeGlowLower.intensity = (lf * (this.treeGlowBack ? 17.5 : 22.0) + starBurstBoost * 12.0) * warmPulse;
+    if (this.treeGlowBack) {
+      this.treeGlowBack.intensity = (lf * 13.0 + starBurstBoost * 8.0) * warmPulse;
+    }
     this.starLight.intensity = (lf * 19.0 + starBurstBoost * 24.0) * warmPulse;
 
     // 2. Animate Physical Damped Pendulum Swings on Clicked Ornaments!
@@ -1282,34 +1309,33 @@ export class LuxuryChristmasTree {
       });
     }
 
-    // 3. Animate the 10 Special Hollow Mystery Gift Boxes (hinged lid, rising 3D card inside box, showcase interior light!)
+    // 3. Animate the 10 Special Hollow Mystery Gift Boxes (hinged lid, lazy interior culling, single shared showcase light!)
+    let activeOpenGift = null;
     for (let i = 0; i < this.specialGifts.length; i++) {
       const g = this.specialGifts[i];
       const isHovered = this.hoveredGiftIdx === g.idx;
       const pulse = 0.5 + 0.5 * Math.sin(elapsedTime * 2.4 + g.idx * 0.9);
 
-      // Hinged hollow lid opens smoothly wide backward when active, peeks softly on hover, closes cleanly when dismissed
       const goalLid = g.isOpenNow ? -1.86 : (isHovered ? -0.24 : 0.0);
       g.lidAngle += (goalLid - g.lidAngle) * Math.min(1, dt * 7.8);
       g.lidPivot.rotation.x = g.lidAngle;
 
-      // Physical 3D vintage card nestled right inside the hollow box rises proudly when lid opens!
-      if (g.interiorObj) {
-        const goalLift = g.isOpenNow ? 1.0 : 0.0;
-        g.cardLift += (goalLift - g.cardLift) * Math.min(1, dt * 5.8);
-        const io = g.interiorObj;
-        io.cardMesh.position.y = THREE.MathUtils.lerp(io.cardClosedY, io.cardOpenY, g.cardLift);
-        io.cardMesh.rotation.x = THREE.MathUtils.lerp(-0.18, -0.05, g.cardLift);
-        // Subtle gentle joyful bob on the miniature 3D keepsake when revealed
-        if (g.isOpenNow) {
-          io.keepsake.rotation.y = 0.24 + Math.sin(elapsedTime * 1.6 + g.idx) * 0.12;
-        }
-      }
+      if (g.isOpenNow) activeOpenGift = g;
 
-      // Soft warm golden light showcasing the teddy bear / snow globe & nestled 3D card inside the hollow box!
-      if (g.innerLight) {
-        const goalLight = g.isOpenNow ? 5.2 : 0.0;
-        g.innerLight.intensity += (goalLight - g.innerLight.intensity) * Math.min(1, dt * 6.5);
+      // Lazy interior culling: only render miniature keepsake + 3D card when box is peeking or open!
+      if (g.interiorObj) {
+        const shouldShow = g.isOpenNow || g.lidAngle < -0.04;
+        g.interiorObj.interior.visible = shouldShow;
+        if (shouldShow) {
+          const goalLift = g.isOpenNow ? 1.0 : 0.0;
+          g.cardLift += (goalLift - g.cardLift) * Math.min(1, dt * 5.8);
+          const io = g.interiorObj;
+          io.cardMesh.position.y = THREE.MathUtils.lerp(io.cardClosedY, io.cardOpenY, g.cardLift);
+          io.cardMesh.rotation.x = THREE.MathUtils.lerp(-0.18, -0.05, g.cardLift);
+          if (g.isOpenNow) {
+            io.keepsake.rotation.y = 0.24 + Math.sin(elapsedTime * 1.6 + g.idx) * 0.12;
+          }
+        }
       }
 
       // Golden breathing aura dims down cleanly while open so it never washes out the cute 3D gift inside!
@@ -1317,6 +1343,18 @@ export class LuxuryChristmasTree {
       const targetOp = isHovered && !g.isOpenNow ? 0.82 : baseOp;
       g.auraSprite.material.opacity += (targetOp - g.auraSprite.material.opacity) * Math.min(1, dt * 8.0);
       g.auraSprite.material.color.setHex(isHovered ? 0xfff2c2 : (g.discovered ? 0x9ef0d4 : 0xffd778));
+    }
+
+    if (this.activeGiftLight) {
+      if (activeOpenGift) {
+        this.activeGiftLight.position.set(
+          activeOpenGift.group.position.x,
+          activeOpenGift.group.position.y + activeOpenGift.boxHeight * 1.15,
+          activeOpenGift.group.position.z
+        );
+      }
+      const goalLight = activeOpenGift ? 5.2 : 0.0;
+      this.activeGiftLight.intensity += (goalLight - this.activeGiftLight.intensity) * Math.min(1, dt * 6.5);
     }
   }
 }

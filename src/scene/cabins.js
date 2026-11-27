@@ -117,12 +117,10 @@ export class NorwegianCabins {
     this.buildExtendedRowingPier(scene);
     this.buildTownSquareDetails();
 
-    // Strategic warm village ambient point lights (bathes the coastal town & church in cozy festive glow)
+    // Consolidated warm village ambient point lights (2 wide harbor lights cover West & East village with 50% less per-pixel PBR light loops!)
     const villageLightAnchors = [
-      { x: -54, z: -118, intensity: 28, dist: 64 },
-      { x: -42, z: -130, intensity: 26, dist: 58 },
-      { x: 42, z: -124, intensity: 28, dist: 64 },
-      { x: 58, z: -132, intensity: 24, dist: 56 }
+      { x: -48, z: -124, intensity: 34, dist: 84 },
+      { x: 48, z: -128, intensity: 34, dist: 84 }
     ];
     for (const a of villageLightAnchors) {
       const y = getTerrainHeight(a.x, a.z);

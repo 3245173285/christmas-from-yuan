@@ -12,16 +12,17 @@ import {
   createForestBoughTexture,
   createFullSpruceCardTexture,
   createGrassClumpTexture,
+  createPanoramicTreelineTexture,
   createSmokePuffTexture,
   createSnowflakeTexture
 } from '../utils/textures.js';
 
-// Dense 3-Tier Scandinavian Taiga Forest + Live Diurnal Snow/Frost on Grass, Rocks & Spruces
-// Tier 1: ~1,050 near-to-midground volumetric multi-frond Norway spruces
-// Tier 2: ~650 evergreen forest-edge shrubs / juniper undergrowth
-// Tier 3: ~2,500 distant hillside crossed-card spruce canopy carpet (blazing fast 1 draw call!)
+// Hybrid 3-Layer Scandinavian Taiga Forest + Live Diurnal Snow/Frost on Grass, Rocks & Spruces
+// Layer 1: Near-edge real 3D volumetric multi-frond Norway spruces (optimized 56-tri crowns!)
+// Layer 2: Midground lightweight 4-tri crossed spruce cards + evergreen undergrowth
+// Layer 3: Pre-baked Panoramic Distant Treeline Texture Bands hugging foothills (hundreds of far pines in 1 tiny draw call!)
 
-// Soft volumetric 3-plane crossed wild-grass clump cushion (replaces stark spiky geometric sticks!)
+// Soft volumetric 3-plane crossed wild-grass clump cushion (lightweight 6-tri clump!)
 function createSoftGrassClumpGeometry() {
   const allPos = [];
   const allNorm = [];
@@ -33,24 +34,17 @@ function createSoftGrassClumpGeometry() {
   const v = new THREE.Vector3();
 
   for (let k = 0; k < 3; k++) {
-    const plane = new THREE.PlaneGeometry(0.92, 0.56, 2, 2);
+    const plane = new THREE.PlaneGeometry(0.92, 0.56, 1, 1);
     plane.translate(0, 0.26, 0);
-    // Gentle organic cup curve
-    const p = plane.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const lx = p.getX(i);
-      const ly = p.getY(i);
-      p.setZ(i, -lx * lx * 0.22 + ly * 0.08);
-    }
 
     dummy.rotation.set(0, (k / 3) * Math.PI + 0.25, 0);
     dummy.updateMatrix();
 
+    const p = plane.attributes.position;
     const ua = plane.attributes.uv;
     for (let i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i).applyMatrix4(dummy.matrix);
       allPos.push(v.x, v.y, v.z);
-      // Soft upward terrain-matched normals so grass clumps blend seamlessly without harsh dark card edges!
       allNorm.push(0, 1, 0);
       allUv.push(ua.getX(i), ua.getY(i));
     }
@@ -106,7 +100,7 @@ function createMossySnowRockGeometry() {
   return geo;
 }
 
-// High-craft Volumetric Multi-Frond Norway Spruce Crown (32 arched radial pine boughs merged)
+// Optimized Realistic Volumetric Multi-Frond Norway Spruce Crown (28 layered radial boughs × 2 tris = 56 tris; 5.7× lighter than 320-tri!)
 function createVolumetricSpruceCrownGeometry() {
   const rand = mulberry32(314159);
   const allPos = [];
@@ -120,19 +114,9 @@ function createVolumetricSpruceCrownGeometry() {
   const n = new THREE.Vector3();
   const normalMatrix = new THREE.Matrix3();
 
-  function appendFrond(width, length, px, py, pz, rx, ry, rz, archAmt) {
-    const plane = new THREE.PlaneGeometry(width, length, 2, 2);
+  function appendFrond(width, length, px, py, pz, rx, ry, rz) {
+    const plane = new THREE.PlaneGeometry(width, length, 1, 1);
     plane.translate(0, length * 0.48, 0);
-
-    const p = plane.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const ly = p.getY(i);
-      const lx = p.getX(i);
-      const t = ly / length;
-      const arch = -archAmt * t * t + archAmt * 0.3 * Math.pow(t, 3.0);
-      const cup = -Math.abs(lx) * 0.16;
-      p.setZ(i, arch + cup);
-    }
     plane.computeVertexNormals();
 
     dummy.position.set(px, py, pz);
@@ -148,7 +132,7 @@ function createVolumetricSpruceCrownGeometry() {
     for (let i = 0; i < posAttr.count; i++) {
       v.fromBufferAttribute(posAttr, i).applyMatrix4(dummy.matrix);
       n.fromBufferAttribute(normAttr, i).applyMatrix3(normalMatrix).normalize();
-      n.y = Math.min(1.0, n.y + 0.42);
+      n.y = Math.min(1.0, n.y + 0.46);
       n.normalize();
 
       allPos.push(v.x, v.y, v.z);
@@ -162,16 +146,15 @@ function createVolumetricSpruceCrownGeometry() {
     plane.dispose();
   }
 
-  // Lush full-skirted Norway spruce whorls starting low to the ground (y=0.9) for rich forest fullness
+  // Lush full-skirted Norway spruce whorls (wider fronds fill full 3D canopy with 82% fewer triangles!)
   const whorls = [
-    { y: 1.05, count: 6, len: 3.15, w: 2.05, pitch: 1.28, arch: 0.48 },
-    { y: 2.35, count: 6, len: 2.85, w: 1.9, pitch: 1.24, arch: 0.42 },
-    { y: 3.7, count: 5, len: 2.5, w: 1.72, pitch: 1.18, arch: 0.36 },
-    { y: 5.05, count: 5, len: 2.15, w: 1.52, pitch: 1.12, arch: 0.3 },
-    { y: 6.35, count: 5, len: 1.8, w: 1.32, pitch: 1.04, arch: 0.25 },
-    { y: 7.55, count: 4, len: 1.42, w: 1.12, pitch: 0.94, arch: 0.2 },
-    { y: 8.7, count: 4, len: 1.05, w: 0.88, pitch: 0.78, arch: 0.14 },
-    { y: 9.75, count: 3, len: 0.76, w: 0.65, pitch: 0.48, arch: 0.08 }
+    { y: 1.05, count: 5, len: 3.35, w: 2.35, pitch: 1.32 },
+    { y: 2.55, count: 5, len: 2.95, w: 2.15, pitch: 1.26 },
+    { y: 4.1, count: 4, len: 2.55, w: 1.92, pitch: 1.18 },
+    { y: 5.65, count: 4, len: 2.1, w: 1.65, pitch: 1.1 },
+    { y: 7.15, count: 4, len: 1.62, w: 1.35, pitch: 0.98 },
+    { y: 8.55, count: 4, len: 1.16, w: 1.02, pitch: 0.78 },
+    { y: 9.7, count: 2, len: 0.85, w: 0.78, pitch: 0.48 }
   ];
 
   for (let wi = 0; wi < whorls.length; wi++) {
@@ -179,18 +162,18 @@ function createVolumetricSpruceCrownGeometry() {
     const baseAngle = wi * 1.17;
     for (let b = 0; b < wh.count; b++) {
       const angle = baseAngle + (b / wh.count) * Math.PI * 2 + (rand() - 0.5) * 0.34;
-      const len = wh.len * (0.86 + rand() * 0.28);
-      const w = wh.w * (0.88 + rand() * 0.24);
+      const len = wh.len * (0.88 + rand() * 0.24);
+      const w = wh.w * (0.9 + rand() * 0.22);
       const py = wh.y + (rand() - 0.5) * 0.28;
-      const pitch = wh.pitch + (rand() - 0.5) * 0.15;
-      const roll = (rand() - 0.5) * 0.32;
-      appendFrond(w, len, 0, py, 0, pitch, angle, roll, wh.arch);
+      const pitch = wh.pitch + (rand() - 0.5) * 0.14;
+      const roll = (rand() - 0.5) * 0.3;
+      appendFrond(w, len, 0, py, 0, pitch, angle, roll);
     }
   }
 
   // Crossed feathery spire leader at top
-  appendFrond(0.78, 1.55, 0, 9.9, 0, 0.06, 0.2, 0, 0.04);
-  appendFrond(0.78, 1.55, 0, 9.9, 0, 0.06, Math.PI * 0.5 + 0.2, 0, 0.04);
+  appendFrond(0.84, 1.6, 0, 9.9, 0, 0.06, 0.2, 0);
+  appendFrond(0.84, 1.6, 0, 9.9, 0, 0.06, Math.PI * 0.5 + 0.2, 0);
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(allPos, 3));
@@ -305,8 +288,9 @@ export class EnvironmentDetails {
     this.buildMeadowGrass(perf.grassCount);
     this.buildMossyRocks();
     this.buildHeroVolumetricForest(perf.forestCount);
-    this.buildEvergreenUndergrowth(perf.shrubCount || 480);
-    this.buildDistantTaigaCarpet(perf.distantForestCount || 1900);
+    this.buildEvergreenUndergrowth(perf.shrubCount || 360);
+    this.buildDistantTaigaCarpet(perf.distantForestCount || 1500);
+    this.buildPanoramicTreelineBackdrop();
     this.buildValleyMist();
     this.buildSnowfall(perf.snowCount);
     this.buildDistantBirds();
@@ -758,27 +742,28 @@ export class EnvironmentDetails {
     while (matrices.length < targetCount && attempts < targetCount * 10) {
       attempts++;
       const a = this.rand() * Math.PI * 2;
-      // Wide panoramic taiga ring from 92m out to 345m sweeping up the lower mountain foothills!
-      const d = 92.0 + Math.pow(this.rand(), 0.82) * 250.0;
+      // Mid-to-far individual 4-tri crossed spruce cards bridging smoothly from 68m out to 190m behind the near 3D woods!
+      const d = 68.0 + Math.pow(this.rand(), 0.85) * 124.0;
       const x = Math.cos(a) * d;
-      const z = Math.sin(a) * d - 42.0;
+      const z = Math.sin(a) * d - 28.0;
 
+      if (Math.abs(x) < 32.0 && z > -135.0 && z < 48.0) continue;
       if (this.isTooCloseToTown(x, z, 11.0)) continue;
 
       const y = getTerrainHeight(x, z);
-      // Grows densely across lower foothills and mountain base up to timberline (y <= 30)
-      if (y < WATER_LEVEL + 1.15 || y > 30.0) continue;
+      // Grows densely across lower foothills and mountain base up to timberline (y <= 27)
+      if (y < WATER_LEVEL + 1.15 || y > 27.0) continue;
 
       const yDx = getTerrainHeight(x + 3.5, z);
       const yDz = getTerrainHeight(x, z + 3.5);
-      if (Math.hypot(yDx - y, yDz - y) > 2.3) continue;
+      if (Math.hypot(yDx - y, yDz - y) > 2.2) continue;
 
       dummy.position.set(x, Math.min(y, yDx, yDz) - 0.55, z);
       dummy.rotation.set(0, this.rand() * Math.PI * 2, 0);
       // Slightly shorter near upper alpine timberline
-      const timberScale = 1.0 - Math.max(0, (y - 18.0) / 18.0) * 0.42;
-      const sc = (0.85 + this.rand() * 0.95) * timberScale;
-      dummy.scale.set(sc * (0.85 + this.rand() * 0.35), sc, sc * (0.85 + this.rand() * 0.35));
+      const timberScale = 1.0 - Math.max(0, (y - 16.0) / 16.0) * 0.38;
+      const sc = (0.92 + this.rand() * 0.9) * timberScale;
+      dummy.scale.set(sc * (0.9 + this.rand() * 0.32), sc, sc * (0.9 + this.rand() * 0.32));
       dummy.updateMatrix();
       matrices.push(dummy.matrix.clone());
 
@@ -797,6 +782,134 @@ export class EnvironmentDetails {
     inst.instanceMatrix.needsUpdate = true;
     if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
     this.group.add(inst);
+  }
+
+  // Layer 3: Pre-Baked Panoramic Distant Treeline Texture Bands hugging the distant hills & foothills!
+  // Renders hundreds of lush overlapping distant pines in 1 single draw call (~480 triangles total!)
+  buildPanoramicTreelineBackdrop() {
+    const tex = createPanoramicTreelineTexture(1024, 256);
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      alphaTest: 0.34,
+      side: THREE.DoubleSide,
+      roughness: 0.9,
+      metalness: 0.0
+    });
+
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uSnowCover = this.snowCoverUniform;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+         varying float vBandV;`
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <uv_vertex>',
+        `#include <uv_vertex>
+         vBandV = uv.y;`
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+         uniform float uSnowCover;
+         varying float vBandV;`
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+         float topFrost = smoothstep(0.32, 0.95, vBandV) * (0.14 + uSnowCover * 0.28);
+         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.84, 0.89, 0.96), topFrost);`
+      );
+    };
+
+    const allPos = [];
+    const allNorm = [];
+    const allUv = [];
+    const allIdx = [];
+    let vOff = 0;
+
+    // 3 concentric stepped treeline ribbon rings wrapping the distant basin & mountain foothills
+    const rings = [
+      { radius: 142, centerZ: -44, segs: 96, height: 18.5, uRepeat: 9, seed: 1.2 },
+      { radius: 196, centerZ: -52, segs: 112, height: 22.0, uRepeat: 12, seed: 2.9 },
+      { radius: 256, centerZ: -58, segs: 124, height: 25.0, uRepeat: 15, seed: 4.7 }
+    ];
+
+    for (const ring of rings) {
+      const pts = [];
+      for (let i = 0; i <= ring.segs; i++) {
+        const t = i / ring.segs;
+        const a = t * Math.PI * 2;
+        const wobble = Math.sin(a * 5.0 + ring.seed) * 14.0 + Math.cos(a * 9.0 - ring.seed) * 8.0;
+        const r = ring.radius + wobble;
+        const x = Math.cos(a) * r;
+        const z = Math.sin(a) * r + ring.centerZ;
+        const y = getTerrainHeight(x, z);
+
+        // Only place forest ribbon on dry hillside & foothill elevations (skip lake surface, town & high snowy peaks)
+        const valid =
+          y > WATER_LEVEL + 1.4 &&
+          y < 32.0 &&
+          !this.isTooCloseToTown(x, z, 15.0);
+
+        pts.push({ x, y, z, valid, u: t * ring.uRepeat });
+      }
+
+      // Emit continuous ribbon segments wherever consecutive vertices sit on valid forested hillside
+      for (let i = 0; i < ring.segs; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        if (!p0.valid || !p1.valid) continue;
+
+        const y0 = p0.y - 1.6;
+        const y1 = p1.y - 1.6;
+        const timber0 = 1.0 - Math.max(0, (p0.y - 16.0) / 20.0) * 0.42;
+        const timber1 = 1.0 - Math.max(0, (p1.y - 16.0) / 20.0) * 0.42;
+        const h0 = ring.height * timber0;
+        const h1 = ring.height * timber1;
+
+        // Soft upward-inward normal so the treeline catches sky/moon/aurora light naturally without harsh flat-card seams
+        const dx = p1.x - p0.x;
+        const dz = p1.z - p0.z;
+        const invL = 1.0 / Math.max(0.001, Math.hypot(dx, dz));
+        const nx = -dz * invL * 0.45;
+        const nz = dx * invL * 0.45;
+        const ny = 0.89;
+
+        allPos.push(
+          p0.x, y0, p0.z,
+          p1.x, y1, p1.z,
+          p0.x, y0 + h0, p0.z,
+          p1.x, y1 + h1, p1.z
+        );
+        for (let k = 0; k < 4; k++) {
+          allNorm.push(nx, ny, nz);
+        }
+        allUv.push(
+          p0.u, 0,
+          p1.u, 0,
+          p0.u, 1,
+          p1.u, 1
+        );
+        allIdx.push(
+          vOff, vOff + 1, vOff + 2,
+          vOff + 1, vOff + 3, vOff + 2
+        );
+        vOff += 4;
+      }
+    }
+
+    if (allIdx.length > 0) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(allPos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(allNorm, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(allUv, 2));
+      geo.setIndex(allIdx);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      this.group.add(mesh);
+    }
   }
 
   buildValleyMist() {
