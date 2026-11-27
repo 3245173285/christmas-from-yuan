@@ -5,30 +5,31 @@ cd /d "%~dp0"
 
 echo.
 echo ====================================================
-echo   正在将最新修改同步到 GitHub (线上链接将自动更新)
+echo   正在将最新代码同步到 GitHub (线上链接将自动更新)
 echo ====================================================
 echo.
 
 git add -A
 git diff --cached --quiet
-if not errorlevel 1 (
-  echo [提示] 当前没有检测到新的修改，无需重复上传。
-  pause
-  exit /b 0
+if errorlevel 1 (
+  git commit -m "Update Christmas from Yuan"
+) else (
+  echo [提示] 没有新的未提交改动，将直接推送已有提交到 GitHub...
 )
 
-set "MSG=Update Christmas from Yuan"
-git commit -m "%MSG%"
-git push origin main
+echo [推送] 如首次使用弹出 GitHub 授权窗口，点击 Sign in with your browser 即可。
+echo.
+git push -u origin main
 
 if errorlevel 1 (
   echo.
-  echo [错误] 推送失败，请检查网络或 GitHub 登录状态。
+  echo [错误] 推送失败，请检查网络或 GitHub 账号授权。
   pause
   exit /b 1
 )
 
 echo.
-echo [成功] 已推送到 GitHub！约 20~40 秒后，手机上的线上链接会自动更新为最新版本。
+echo [成功] 已推送到 GitHub！
+echo        绑定 Cloudflare Pages / Vercel 后，约 20~40 秒线上手机链接会自动更新。
 echo.
 pause
