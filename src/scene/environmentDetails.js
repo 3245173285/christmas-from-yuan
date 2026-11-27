@@ -392,7 +392,7 @@ export class EnvironmentDetails {
     while (matrices.length < targetClumps && attempts < targetClumps * 10) {
       attempts++;
       const angle = this.rand() * Math.PI * 2;
-      const radius = 6.6 + Math.pow(this.rand(), 0.72) * 58.0;
+      const radius = 8.4 + Math.pow(this.rand(), 0.72) * 58.0;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius + 3.0;
 

@@ -21,11 +21,17 @@ export class FrostIntro {
     this.active = true;
     this.melting = false;
     this.meltProgress = 0;
-    this.isDrawing = false;
     this.lastPos = null;
     this.hoverPos = null;
     this.hasWiped = false;
     this.rafId = null;
+
+    // Fast lightweight coverage grid (24x16) to detect when ~40% of the ice wall has been wiped open!
+    this.gridCols = 24;
+    this.gridRows = 16;
+    this.wipeGrid = new Uint8Array(this.gridCols * this.gridRows);
+    this.wipedCells = 0;
+    this.autoEnterThreshold = 0.4;
 
     this.flakes = [];
     this.sparkles = [];
@@ -50,6 +56,8 @@ export class FrostIntro {
     this.frostCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    this.wipeGrid.fill(0);
+    this.wipedCells = 0;
     this.paintOpaqueGlacialIce();
   }
 
@@ -328,12 +336,46 @@ export class FrostIntro {
     ctx.restore();
   }
 
-  // Carve / melt open a crystal window through the solid dark glacial ice (ONLY while Left Mouse Button held!)
+  // Mark coverage grid cells inside wiped circle and auto-trigger smooth dissolve at 40% cleared!
+  recordWipeCoverage(px, py, radius) {
+    const cellW = this.w / this.gridCols;
+    const cellH = this.h / this.gridRows;
+    const effR = radius * 0.88;
+    const minC = Math.max(0, Math.floor((px - effR) / cellW));
+    const maxC = Math.min(this.gridCols - 1, Math.floor((px + effR) / cellW));
+    const minR = Math.max(0, Math.floor((py - effR) / cellH));
+    const maxR = Math.min(this.gridRows - 1, Math.floor((py + effR) / cellH));
+
+    for (let r = minR; r <= maxR; r++) {
+      const cy = (r + 0.5) * cellH;
+      for (let c = minC; c <= maxC; c++) {
+        const idx = r * this.gridCols + c;
+        if (this.wipeGrid[idx]) continue;
+        const cx = (c + 0.5) * cellW;
+        if (Math.hypot(cx - px, cy - py) <= effR) {
+          this.wipeGrid[idx] = 1;
+          this.wipedCells++;
+        }
+      }
+    }
+
+    const ratio = this.wipedCells / this.wipeGrid.length;
+    // Gently soften the center copy as you approach 40% wiped
+    if (ratio > 0.18 && this.root) {
+      const softFade = Math.max(0.35, 1.0 - (ratio - 0.18) * 1.8);
+      this.root.style.setProperty('--wipe-copy-opacity', softFade.toFixed(2));
+    }
+    if (ratio >= this.autoEnterThreshold) {
+      this.triggerEnter();
+    }
+  }
+
+  // Free swipe/hover melt through the dark glacial lake ice (no need to hold mouse button!)
   carveIceAt(x, y) {
     if (!this.active || this.melting) return;
 
     const ctx = this.frostCtx;
-    const radius = 64;
+    const radius = Math.max(58, Math.min(78, Math.min(this.w, this.h) * 0.09));
 
     const carveDab = (px, py, r) => {
       // Luminous crystalline thawed-ice rim along the carved perimeter
@@ -341,7 +383,7 @@ export class FrostIntro {
       ctx.globalCompositeOperation = 'source-atop';
       const rimGrad = ctx.createRadialGradient(px, py, r * 0.64, px, py, r * 1.18);
       rimGrad.addColorStop(0.0, 'rgba(165, 225, 255, 0)');
-      rimGrad.addColorStop(0.55, 'rgba(160, 224, 255, 0.24)');
+      rimGrad.addColorStop(0.55, 'rgba(160, 224, 255, 0.22)');
       rimGrad.addColorStop(1.0, 'rgba(160, 224, 255, 0)');
       ctx.fillStyle = rimGrad;
       ctx.beginPath();
@@ -362,22 +404,25 @@ export class FrostIntro {
       ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+
+      this.recordWipeCoverage(px, py, r);
     };
 
     if (this.lastPos) {
       const dx = x - this.lastPos.x;
       const dy = y - this.lastPos.y;
       const dist = Math.hypot(dx, dy);
-      const steps = Math.max(1, Math.min(26, Math.ceil(dist / 10)));
+      const steps = Math.max(1, Math.min(24, Math.ceil(dist / 12)));
       for (let i = 1; i <= steps; i++) {
         const t = i / steps;
         carveDab(this.lastPos.x + dx * t, this.lastPos.y + dy * t, radius);
+        if (this.melting) break;
       }
     } else {
       carveDab(x, y, radius);
     }
 
-    for (let k = 0; k < 4; k++) {
+    for (let k = 0; k < 3; k++) {
       const a = Math.random() * Math.PI * 2;
       const d = 14 + Math.random() * 40;
       this.sparkles.push({
@@ -402,56 +447,40 @@ export class FrostIntro {
   triggerEnter() {
     if (this.melting || !this.active) return;
     this.melting = true;
-    this.isDrawing = false;
     this.meltProgress = 0;
     this.root.classList.add('is-melting');
     if (this.onEnter) this.onEnter();
   }
 
   bindEvents() {
-    const onPointerDown = (e) => {
+    const onSwipe = (clientX, clientY, target) => {
       if (!this.active || this.melting) return;
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (e.target && e.target.closest && e.target.closest('#btn-enter-scene')) return;
-
-      this.isDrawing = true;
-      this.lastPos = null;
-      this.root.classList.add('is-carving');
-      this.carveIceAt(e.clientX, e.clientY);
+      if (target && target.closest && target.closest('#btn-enter-scene')) return;
+      this.hoverPos = { x: clientX, y: clientY };
+      this.carveIceAt(clientX, clientY);
     };
 
-    const onPointerMove = (e) => {
-      if (!this.active || this.melting) return;
-      this.hoverPos = { x: e.clientX, y: e.clientY };
+    this.root.addEventListener('pointermove', (e) => {
+      onSwipe(e.clientX, e.clientY, e.target);
+    }, { passive: true });
 
-      if (this.isDrawing) {
-        if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) {
-          this.isDrawing = false;
-          this.lastPos = null;
-          this.root.classList.remove('is-carving');
-          return;
-        }
-        this.carveIceAt(e.clientX, e.clientY);
+    this.root.addEventListener('pointerdown', (e) => {
+      this.lastPos = null;
+      onSwipe(e.clientX, e.clientY, e.target);
+    }, { passive: true });
+
+    this.root.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) {
+        onSwipe(e.touches[0].clientX, e.touches[0].clientY, e.target);
       }
-    };
+    }, { passive: true });
 
-    const onPointerUp = () => {
-      this.isDrawing = false;
+    const resetTrail = () => {
       this.lastPos = null;
-      this.root.classList.remove('is-carving');
-    };
-
-    const onPointerLeave = () => {
       this.hoverPos = null;
-      this.isDrawing = false;
-      this.lastPos = null;
-      this.root.classList.remove('is-carving');
     };
-
-    this.root.addEventListener('pointerdown', onPointerDown);
-    this.root.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerup', onPointerUp, { passive: true });
-    this.root.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    this.root.addEventListener('pointerleave', resetTrail, { passive: true });
+    this.root.addEventListener('touchend', resetTrail, { passive: true });
 
     if (this.enterBtn) {
       this.enterBtn.addEventListener('click', (e) => {
@@ -473,22 +502,14 @@ export class FrostIntro {
       const dt = Math.min((now - prev) / 1000, 0.05);
       prev = now;
 
+      // Smooth full-screen gentle fade + thaw dissolve when >= 40% wiped or Enter button clicked!
       if (this.melting) {
-        this.meltProgress += dt * 1.15;
-        const maxR = Math.hypot(this.w, this.h) * 0.78;
-        const curR = Math.pow(Math.min(1, this.meltProgress), 1.25) * maxR;
-        const fctx = this.frostCtx;
-        fctx.save();
-        fctx.globalCompositeOperation = 'destination-out';
-        const g = fctx.createRadialGradient(this.w * 0.5, this.h * 0.5, curR * 0.42, this.w * 0.5, this.h * 0.5, Math.max(10, curR));
-        g.addColorStop(0, 'rgba(0,0,0,1)');
-        g.addColorStop(0.75, 'rgba(0,0,0,0.78)');
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        fctx.fillStyle = g;
-        fctx.fillRect(0, 0, this.w, this.h);
-        fctx.restore();
+        this.meltProgress += dt * 0.92;
+        const opacity = Math.max(0, 1.0 - Math.pow(Math.min(1, this.meltProgress), 1.15));
+        this.frostCanvas.style.opacity = opacity.toFixed(3);
+        this.fxCanvas.style.opacity = opacity.toFixed(3);
 
-        if (this.meltProgress >= 1.08) {
+        if (this.meltProgress >= 1.02) {
           this.active = false;
           this.root.classList.add('is-gone');
           window.removeEventListener('resize', this._onResize);
@@ -500,13 +521,12 @@ export class FrostIntro {
       ctx.clearRect(0, 0, this.w, this.h);
       const t = now * 0.001;
 
-      // Subtle glossy arctic moonlight sheen gliding over the opaque dark lake ice under cursor
       if (this.hoverPos && !this.melting) {
         const { x, y } = this.hoverPos;
-        const rad = this.isDrawing ? 95 : 140;
+        const rad = 110;
         const glow = ctx.createRadialGradient(x, y, 0, x, y, rad);
-        glow.addColorStop(0, this.isDrawing ? 'rgba(185, 232, 255, 0.22)' : 'rgba(140, 206, 255, 0.14)');
-        glow.addColorStop(0.55, 'rgba(90, 170, 230, 0.04)');
+        glow.addColorStop(0, 'rgba(185, 232, 255, 0.2)');
+        glow.addColorStop(0.55, 'rgba(90, 170, 230, 0.05)');
         glow.addColorStop(1, 'rgba(90, 170, 230, 0)');
         ctx.fillStyle = glow;
         ctx.beginPath();

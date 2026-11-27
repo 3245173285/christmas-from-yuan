@@ -22,7 +22,7 @@
       <div class="frost-center-copy">
         <h1 class="frost-title">CHRISTMAS FROM YUAN</h1>
         <p class="frost-subtitle">A little magic beneath the northern lights.</p>
-        <div id="frost-hint">按住鼠标左键划开冰面 · Hold &amp; drag to melt the ice</div>
+        <div id="frost-hint">轻划冰面，开启冬日奇境</div>
       </div>
 
       <div class="frost-enter-wrap">
@@ -42,26 +42,6 @@
         <h1 class="hero-title">CHRISTMAS FROM YUAN</h1>
         <p class="hero-subtitle">A little magic beneath the northern lights.</p>
       </header>
-
-      <!-- Subtle Top-Right Liquid Glass Interactive Gift Counter & Magic Guide -->
-      <div class="magic-corner">
-        <button id="gift-counter-badge" class="liquid-badge" type="button" title="查看互动玩法提示">
-          <svg viewBox="0 0 24 24">
-            <polyline points="20 12 20 22 4 22 4 12" />
-            <rect x="2" y="7" width="20" height="5" />
-            <line x1="12" y1="22" x2="12" y2="7" />
-            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
-          </svg>
-          <span id="gift-counter-text">0 / 10</span>
-        </button>
-        <div id="magic-hint-toast" class="magic-hint-toast">
-          <div>✦ 点击<strong>树顶金星</strong> · 倾泻星光波浪</div>
-          <div>♪ 点击<strong>树上挂球</strong> · 晃动奏响八音盒</div>
-          <div>🎁 点击<strong>金光礼盒</strong> · 拉近拆复古贺卡</div>
-          <div>☄ 点击<strong>夜空任意处</strong> · 召唤许愿流星</div>
-        </div>
-      </div>
 
       <footer class="liquid-dock" aria-label="场景控制面板">
         <div class="timeline-row">
@@ -97,17 +77,17 @@
           <div class="tool-divider"></div>
 
           <!-- 4 One-Click Time Presets -->
-          <div class="tool-group">
+          <div class="tool-group preset-group">
             <button class="pill-btn" data-preset="dawn" title="切换至清晨">清晨</button>
             <button class="pill-btn" data-preset="noon" title="切换至正午">正午</button>
             <button class="pill-btn" data-preset="dusk" title="切换至黄昏">黄昏</button>
-            <button class="pill-btn is-active" data-preset="aurora" title="切换至极光夜景">极光夜景</button>
+            <button class="pill-btn is-active" data-preset="aurora" title="切换至极光夜景">极光</button>
           </div>
 
           <div class="tool-divider"></div>
 
-          <!-- Environment & Snow Size Controls -->
-          <div class="tool-group">
+          <!-- Environment & Snow Intensity Controls -->
+          <div class="tool-group action-group">
             <div class="snow-control-capsule" title="降雪开关与降雪强度调节（小雪 → 大雪）">
               <button id="btn-snow" class="icon-btn is-active" title="降雪开关" aria-label="降雪开关">
                 <svg viewBox="0 0 24 24">

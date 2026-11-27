@@ -1030,41 +1030,66 @@ export class LuxuryChristmasTree {
       return { group: bg, lidPivot, auraSprite, innerLight, interiorObj, hitMesh };
     };
 
-    // 10 Hero Special Interactive Hollow Mystery Gift Boxes positioned cleanly along outer snow perimeter
-    // (unobstructed by pine branches or neighboring boxes for crystal-clear close-up unboxing!)
+    // 10 Special Hollow Mystery Gift Boxes scattered organically at natural varied distances (not cramped tightly against trunk!)
+    // + 38 abundant luxury decorative boxes forming a lavish European holiday display around the snowy meadow!
     const boxSpecs = [
-      { a: 0.12, r: 4.55, w: 1.18, h: 0.86, d: 0.98, specialIdx: 0 },
-      { a: -0.48, r: 4.62, w: 1.12, h: 0.88, d: 0.96, specialIdx: 1 },
-      { a: 0.72, r: 4.55, w: 1.08, h: 0.84, d: 0.92, specialIdx: 2 },
-      { a: -1.08, r: 4.58, w: 1.06, h: 0.82, d: 0.92, specialIdx: 3 },
-      { a: 1.32, r: 4.56, w: 1.12, h: 0.84, d: 0.94, specialIdx: 4 },
-      { a: 1.98, r: 4.58, w: 1.08, h: 0.82, d: 0.94, specialIdx: 5 },
-      { a: 2.66, r: 4.55, w: 1.08, h: 0.84, d: 0.92, specialIdx: 6 },
-      { a: 3.38, r: 4.6, w: 1.12, h: 0.86, d: 0.96, specialIdx: 7 },
-      { a: 4.12, r: 4.56, w: 1.08, h: 0.86, d: 0.92, specialIdx: 8 },
-      { a: 4.92, r: 4.6, w: 1.1, h: 0.84, d: 0.94, specialIdx: 9 },
+      // 10 Special Hollow Mystery Gift Boxes (varied distances r = 4.55 .. 6.25 & natural asymmetric scatter!)
+      { a: 0.14, r: 5.35, w: 1.18, h: 0.86, d: 0.98, specialIdx: 0 },
+      { a: -0.58, r: 4.82, w: 1.12, h: 0.88, d: 0.96, specialIdx: 1 },
+      { a: 0.84, r: 5.95, w: 1.1, h: 0.84, d: 0.92, specialIdx: 2 },
+      { a: -1.26, r: 5.65, w: 1.08, h: 0.84, d: 0.92, specialIdx: 3 },
+      { a: 1.56, r: 4.95, w: 1.14, h: 0.84, d: 0.94, specialIdx: 4 },
+      { a: 2.24, r: 6.1, w: 1.1, h: 0.82, d: 0.94, specialIdx: 5 },
+      { a: 2.92, r: 4.9, w: 1.08, h: 0.84, d: 0.92, specialIdx: 6 },
+      { a: 3.68, r: 5.8, w: 1.14, h: 0.86, d: 0.96, specialIdx: 7 },
+      { a: 4.38, r: 4.85, w: 1.08, h: 0.86, d: 0.92, specialIdx: 8 },
+      { a: 5.18, r: 5.75, w: 1.12, h: 0.84, d: 0.94, specialIdx: 9 },
 
-      // 20 Classic Decorative Luxury Gift Boxes tucked gracefully along inner ring behind the 10 special boxes
-      { a: 0.42, r: 3.55, w: 0.86, h: 0.68, d: 0.82, wi: 0, ri: 0 },
-      { a: -0.18, r: 3.5, w: 0.92, h: 0.64, d: 0.82, wi: 4, ri: 1 },
-      { a: -0.78, r: 3.55, w: 0.96, h: 0.62, d: 0.82, wi: 1, ri: 0 },
-      { a: 1.02, r: 3.52, w: 0.88, h: 0.72, d: 0.78, wi: 3, ri: 0 },
-      { a: 1.65, r: 3.58, w: 0.9, h: 0.76, d: 0.82, wi: 1, ri: 0 },
-      { a: 2.32, r: 3.55, w: 0.96, h: 0.64, d: 0.86, wi: 4, ri: 1 },
-      { a: 3.02, r: 3.58, w: 0.94, h: 0.68, d: 0.84, wi: 3, ri: 0 },
-      { a: 3.75, r: 3.56, w: 0.92, h: 0.72, d: 0.84, wi: 0, ri: 0 },
-      { a: 4.52, r: 3.54, w: 0.96, h: 0.64, d: 0.86, wi: 5, ri: 1 },
-      { a: 5.38, r: 3.58, w: 0.94, h: 0.7, d: 0.84, wi: 1, ri: 0 },
-      { a: 5.78, r: 3.72, w: 0.84, h: 0.62, d: 0.76, wi: 4, ri: 1 },
-      { a: 1.65, r: 3.58, w: 0.52, h: 0.4, d: 0.5, wi: 2, ri: 1, stackY: 0.78 },
-      { a: 3.75, r: 3.56, w: 0.54, h: 0.4, d: 0.52, wi: 4, ri: 0, stackY: 0.74 },
-      { a: 2.32, r: 3.55, w: 0.52, h: 0.38, d: 0.5, wi: 0, ri: 0, stackY: 0.66 },
-      { a: 5.38, r: 3.58, w: 0.52, h: 0.38, d: 0.48, wi: 5, ri: 1, stackY: 0.72 },
-      { a: -0.18, r: 3.5, w: 0.54, h: 0.4, d: 0.5, wi: 2, ri: 1, stackY: 0.66 },
-      { a: 1.02, r: 3.52, w: 0.5, h: 0.38, d: 0.48, wi: 4, ri: 0, stackY: 0.74 },
-      { a: 2.98, r: 3.92, w: 0.62, h: 0.44, d: 0.58, wi: 2, ri: 0 },
-      { a: 4.52, r: 3.54, w: 0.52, h: 0.38, d: 0.48, wi: 0, ri: 0, stackY: 0.66 },
-      { a: 0.42, r: 3.55, w: 0.5, h: 0.38, d: 0.48, wi: 5, ri: 1, stackY: 0.7 }
+      // Abundant Inner & Mid Ring Decorative Luxury Gift Boxes (38 boxes with natural clusters & stacked towers!)
+      { a: -0.18, r: 3.55, w: 0.96, h: 0.68, d: 0.84, wi: 4, ri: 1 },
+      { a: 0.42, r: 3.62, w: 0.88, h: 0.72, d: 0.82, wi: 0, ri: 0 },
+      { a: -0.82, r: 3.58, w: 0.98, h: 0.64, d: 0.84, wi: 1, ri: 0 },
+      { a: 1.05, r: 3.6, w: 0.9, h: 0.74, d: 0.8, wi: 3, ri: 0 },
+      { a: 1.72, r: 3.62, w: 0.92, h: 0.78, d: 0.84, wi: 1, ri: 0 },
+      { a: 2.35, r: 3.58, w: 0.98, h: 0.66, d: 0.86, wi: 4, ri: 1 },
+      { a: 3.04, r: 3.6, w: 0.94, h: 0.7, d: 0.84, wi: 3, ri: 0 },
+      { a: 3.74, r: 3.58, w: 0.94, h: 0.74, d: 0.84, wi: 0, ri: 0 },
+      { a: 4.48, r: 3.56, w: 0.96, h: 0.66, d: 0.86, wi: 5, ri: 1 },
+      { a: 5.22, r: 3.6, w: 0.94, h: 0.72, d: 0.84, wi: 1, ri: 0 },
+      { a: 5.78, r: 3.75, w: 0.86, h: 0.64, d: 0.78, wi: 4, ri: 1 },
+
+      // Generous Mid-Outer Meadow Clusters (adds rich fullness around the tree & between special gifts)
+      { a: -0.22, r: 4.48, w: 0.84, h: 0.56, d: 0.78, wi: 2, ri: 1 },
+      { a: 0.52, r: 4.52, w: 0.92, h: 0.64, d: 0.8, wi: 5, ri: 1 },
+      { a: -0.96, r: 4.56, w: 0.82, h: 0.58, d: 0.76, wi: 0, ri: 2 },
+      { a: 1.18, r: 4.62, w: 0.86, h: 0.6, d: 0.78, wi: 4, ri: 0 },
+      { a: 1.94, r: 4.68, w: 0.9, h: 0.62, d: 0.82, wi: 2, ri: 1 },
+      { a: 2.58, r: 4.65, w: 0.84, h: 0.54, d: 0.76, wi: 1, ri: 0 },
+      { a: 3.32, r: 4.58, w: 0.88, h: 0.62, d: 0.8, wi: 4, ri: 1 },
+      { a: 4.04, r: 4.66, w: 0.82, h: 0.58, d: 0.76, wi: 3, ri: 0 },
+      { a: 4.82, r: 4.58, w: 0.9, h: 0.6, d: 0.82, wi: 0, ri: 0 },
+      { a: 5.56, r: 4.62, w: 0.86, h: 0.56, d: 0.78, wi: 2, ri: 1 },
+
+      // Scattered Outer-Meadow Gift Accents (extending naturally into the snow clearing)
+      { a: -0.34, r: 5.85, w: 0.74, h: 0.5, d: 0.68, wi: 3, ri: 0 },
+      { a: 0.44, r: 5.72, w: 0.76, h: 0.52, d: 0.7, wi: 0, ri: 2 },
+      { a: -0.88, r: 5.95, w: 0.78, h: 0.54, d: 0.72, wi: 5, ri: 1 },
+      { a: 1.28, r: 5.85, w: 0.74, h: 0.48, d: 0.68, wi: 1, ri: 0 },
+      { a: 2.66, r: 5.92, w: 0.76, h: 0.52, d: 0.7, wi: 2, ri: 0 },
+      { a: 4.18, r: 5.88, w: 0.74, h: 0.5, d: 0.68, wi: 4, ri: 1 },
+      { a: 5.64, r: 5.82, w: 0.78, h: 0.54, d: 0.72, wi: 3, ri: 0 },
+
+      // Stacked Luxury Gift Towers (gives vertical sculptural silhouette around the tree skirt)
+      { a: -0.18, r: 3.55, w: 0.56, h: 0.42, d: 0.52, wi: 2, ri: 1, stackY: 0.7 },
+      { a: 0.42, r: 3.62, w: 0.52, h: 0.4, d: 0.5, wi: 5, ri: 1, stackY: 0.74 },
+      { a: -0.82, r: 3.58, w: 0.54, h: 0.4, d: 0.5, wi: 4, ri: 0, stackY: 0.66 },
+      { a: 1.05, r: 3.6, w: 0.52, h: 0.38, d: 0.48, wi: 0, ri: 0, stackY: 0.76 },
+      { a: 1.72, r: 3.62, w: 0.54, h: 0.42, d: 0.52, wi: 2, ri: 1, stackY: 0.8 },
+      { a: 2.35, r: 3.58, w: 0.54, h: 0.4, d: 0.5, wi: 0, ri: 0, stackY: 0.68 },
+      { a: 3.04, r: 3.6, w: 0.52, h: 0.38, d: 0.48, wi: 5, ri: 1, stackY: 0.72 },
+      { a: 3.74, r: 3.58, w: 0.56, h: 0.42, d: 0.52, wi: 4, ri: 0, stackY: 0.76 },
+      { a: 4.48, r: 3.56, w: 0.52, h: 0.38, d: 0.5, wi: 0, ri: 0, stackY: 0.68 },
+      { a: 5.22, r: 3.6, w: 0.54, h: 0.4, d: 0.5, wi: 2, ri: 1, stackY: 0.74 }
     ];
 
     for (const s of boxSpecs) {

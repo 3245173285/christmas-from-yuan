@@ -109,19 +109,14 @@ function initNordicChristmas() {
     audioEngine
   });
 
-  // Interactive Frosted-Ice Intro Overlay -> reveals Liquid Glass HUD & brief gentle interaction hint upon Enter
+  // Interactive Glacial-Ice Intro Overlay -> reveals Liquid Glass HUD smoothly upon >=40% wipe or Enter
   const hudRoot = document.getElementById('hud-root');
-  const magicToast = document.getElementById('magic-hint-toast');
   new FrostIntro({
     onEnter: () => {
       if (hudRoot) {
         setTimeout(() => {
           hudRoot.classList.remove('is-awaiting-intro');
           ui.resetIdleFade();
-          if (magicToast) {
-            magicToast.classList.add('is-visible');
-            setTimeout(() => magicToast.classList.remove('is-visible'), 6200);
-          }
         }, 380);
       }
     }

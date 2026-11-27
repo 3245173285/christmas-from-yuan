@@ -100,7 +100,8 @@ body {
   text-align: center;
   pointer-events: none;
   padding: 26px 46px;
-  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  opacity: var(--wipe-copy-opacity, 1);
+  transition: opacity 0.65s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .frost-title {
@@ -635,45 +636,112 @@ body {
 }
 
 @media (max-width: 768px) {
+  #hud-root {
+    padding: max(18px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom));
+  }
   .hero-header {
-    margin-top: 34px;
-    padding: 4px 12px 6px;
+    padding: 6px 14px 8px;
   }
   .hero-title {
-    font-size: 1.12rem;
-    letter-spacing: 0.22em;
-    padding-left: 0.22em;
+    font-size: 1.24rem;
+    letter-spacing: 0.24em;
+    padding-left: 0.24em;
   }
   .hero-subtitle {
-    font-size: 0.8rem;
-  }
-  .magic-corner {
-    top: 12px;
-    right: 12px;
-  }
-  .liquid-badge {
-    padding: 5px 11px;
-    font-size: 0.72rem;
+    margin-top: 5px;
+    font-size: 0.82rem;
   }
   .liquid-dock {
-    padding: 10px 13px;
-    border-radius: 22px;
-    backdrop-filter: blur(14px) saturate(150%);
-    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    width: min(420px, 94vw);
+    padding: 12px 14px 11px;
+    border-radius: 26px;
+    gap: 10px;
+    backdrop-filter: blur(16px) saturate(165%) brightness(1.05);
+    -webkit-backdrop-filter: blur(16px) saturate(165%) brightness(1.05);
   }
-  .liquid-enter-btn,
-  .liquid-badge {
-    backdrop-filter: blur(14px) saturate(150%);
-    -webkit-backdrop-filter: blur(14px) saturate(150%);
+  .liquid-enter-btn {
+    padding: 12px 26px;
+    font-size: 0.86rem;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+  .timeline-row {
+    gap: 10px;
   }
   .time-readout {
-    min-width: 96px;
+    min-width: 86px;
+    gap: 5px;
   }
+  #virtual-clock {
+    font-size: 0.86rem;
+  }
+  #phase-label {
+    font-size: 0.68rem;
+  }
+  .tool-divider {
+    display: none;
+  }
+  /* Ultra-sleek Apple iOS 2-row toolbar: Row A = 4-pill segmented time bar, Row B = all action icons on one clean line! */
   .toolbar-row {
-    justify-content: center;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 6px;
+  }
+  .preset-group {
+    order: 1;
+    flex: 1 0 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .preset-group .pill-btn {
+    width: 100%;
+    height: 29px;
+    padding: 0 6px;
+    font-size: 0.74rem;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+  .preset-group .pill-btn.is-active {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(220, 236, 255, 0.18) 100%);
+    border-color: rgba(255, 255, 255, 0.45);
+  }
+  .toolbar-row > .tool-group:first-child {
+    order: 2;
+    gap: 4px;
+  }
+  .action-group {
+    order: 3;
+    flex: 1;
+    justify-content: flex-end;
+    gap: 5px;
+  }
+  .icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+  .speed-btn {
+    min-width: 34px;
+    height: 30px;
+    padding: 0 6px;
+    font-size: 0.72rem;
+  }
+  .snow-control-capsule {
+    padding: 2px 8px 2px 2px;
+    gap: 5px;
   }
   #snow-size-slider {
-    width: 46px;
+    width: 48px;
+  }
+  #btn-fullscreen {
+    display: none;
   }
 }
 
