@@ -13,8 +13,8 @@ import {
   createFullSpruceCardTexture,
   createGrassClumpTexture,
   createPanoramicTreelineTexture,
-  createSmokePuffTexture,
-  createSnowflakeTexture
+  createSnowflakeTexture,
+  createWispyMistRibbonTexture
 } from '../utils/textures.js';
 
 // Hybrid 3-Layer Scandinavian Taiga Forest + Live Diurnal Snow/Frost on Grass, Rocks & Spruces
@@ -382,6 +382,7 @@ export class EnvironmentDetails {
       const z = Math.sin(angle) * radius + 3.0;
 
       if (getPathFactor(x, z) > 0.2) continue;
+      if (Math.hypot(x + 8.2, z - 7.2) < 2.8) continue;
 
       // Cluster grass naturally into sweeping meadow patches & drifts via 2D FBM (never uniform spiky stubble!)
       const patch = fbm2D(x * 0.075 + 2.3, z * 0.075 - 1.4, 3) * 0.5 + 0.5;
@@ -466,6 +467,7 @@ export class EnvironmentDetails {
       const z = Math.sin(angle) * dist - 6.0;
 
       if (Math.hypot(x - 2.4, z - 24.5) < 9.5) continue;
+      if (Math.hypot(x + 8.2, z - 7.2) < 3.4) continue;
       if (z > 10 && Math.abs(x) < 12) continue;
       if (getPathFactor(x, z) > 0.3) continue;
 
@@ -543,40 +545,73 @@ export class EnvironmentDetails {
       roughness: 0.94
     });
 
-    // Dense overlapping woodland groves flanking both sides of the wide plain, backing the coastal town, and wrapping behind!
+    // Organic Clustered Woodland Pockets (natural clearings & scenic gaps rather than a uniform fence!)
     const groves = [
-      // Dense West Forest Wall flanking left plain
-      { cx: -64, cz: -18, rx: 32, rz: 44 },
-      { cx: -92, cz: -72, rx: 36, rz: 46 },
-      { cx: -86, cz: -158, rx: 46, rz: 32 },
-      // Dense East Forest Wall flanking right plain
-      { cx: 68, cz: -14, rx: 32, rz: 44 },
-      { cx: 96, cz: -68, rx: 36, rz: 48 },
-      { cx: 92, cz: -155, rx: 48, rz: 34 },
-      // Lush forested hillside backdrop cradling the coastal village (including center valley pass behind lake!)
-      { cx: -32, cz: -162, rx: 46, rz: 26 },
-      { cx: 0, cz: -168, rx: 38, rz: 24 },
-      { cx: 36, cz: -166, rx: 46, rz: 26 },
-      // Deep southern woods behind the open meadow (for 360° orbit immersion)
-      { cx: -62, cz: 58, rx: 42, rz: 36 },
-      { cx: 66, cz: 60, rx: 42, rz: 36 },
-      { cx: 0, cz: 92, rx: 64, rz: 34 }
+      // Left meadow-edge picturesque spruce clusters with breathing room between them
+      { cx: -52, cz: -8, rx: 22, rz: 26 },
+      { cx: -76, cz: -44, rx: 28, rz: 34 },
+      { cx: -96, cz: -96, rx: 32, rz: 38 },
+      { cx: -86, cz: -158, rx: 42, rz: 28 },
+      // Right meadow-edge picturesque spruce clusters
+      { cx: 56, cz: -4, rx: 22, rz: 26 },
+      { cx: 82, cz: -42, rx: 28, rz: 34 },
+      { cx: 98, cz: -92, rx: 34, rz: 40 },
+      { cx: 92, cz: -155, rx: 44, rz: 30 },
+      // Lush forested hillside pockets cradling the coastal village (leaving valley sightlines airy)
+      { cx: -38, cz: -162, rx: 38, rz: 24 },
+      { cx: 2, cz: -172, rx: 30, rz: 20 },
+      { cx: 42, cz: -165, rx: 38, rz: 24 },
+      // Southern wooded pockets behind the open meadow (natural rhythm on 360° orbit)
+      { cx: -58, cz: 54, rx: 32, rz: 28 },
+      { cx: 62, cz: 56, rx: 32, rz: 28 },
+      { cx: -14, cz: 88, rx: 36, rz: 26 },
+      { cx: 34, cz: 94, rx: 32, rz: 24 }
     ];
 
     const matrices = [];
     const tints = [];
     const dummy = new THREE.Object3D();
-    const colA = new THREE.Color('#c2d6ca');
-    const colB = new THREE.Color('#eaf4ef');
-    const colC = new THREE.Color('#9fb9ab');
+    const colA = new THREE.Color('#bad6c8');
+    const colB = new THREE.Color('#e6f3ee');
+    const colC = new THREE.Color('#8fae9e');
+    const colD = new THREE.Color('#9ec0c4'); // Subtle frosty Nordic blue-spruce accent
     const tmpCol = new THREE.Color();
+
+    // First place ~14 picturesque foreground meadow-edge sentinel clusters (1 tall elder + 2-3 young spruces nestled beside it!)
+    const sentinelAnchors = [
+      [-40, 12], [-44, -26], [-50, -64], [-36, 36],
+      [42, 14], [46, -24], [52, -60], [38, 38],
+      [-64, 24], [66, 26], [-32, -142], [32, -146]
+    ];
+    for (const [ax, az] of sentinelAnchors) {
+      const members = 3 + Math.floor(this.rand() * 2);
+      for (let m = 0; m < members; m++) {
+        const isElder = m === 0;
+        const oa = this.rand() * Math.PI * 2;
+        const od = isElder ? 0 : (3.2 + this.rand() * 5.2);
+        const x = ax + Math.cos(oa) * od;
+        const z = az + Math.sin(oa) * od;
+        if (this.isTooCloseToTown(x, z, 9.2) || getPathFactor(x, z) > 0.12) continue;
+        const y = getTerrainHeight(x, z);
+        if (y < WATER_LEVEL + 1.0 || y > 18.5) continue;
+        const sc = isElder ? (1.32 + this.rand() * 0.42) : (0.58 + this.rand() * 0.45);
+        dummy.position.set(x, y - 0.35, z);
+        dummy.rotation.set((this.rand() - 0.5) * 0.04, this.rand() * Math.PI * 2, (this.rand() - 0.5) * 0.04);
+        dummy.scale.set(sc * 0.96, sc * (1.02 + this.rand() * 0.18), sc * 0.96);
+        dummy.updateMatrix();
+        matrices.push(dummy.matrix.clone());
+        tmpCol.copy(isElder ? colB : (this.rand() > 0.5 ? colD : colA));
+        tints.push(tmpCol.r, tmpCol.g, tmpCol.b);
+      }
+    }
 
     let attempts = 0;
     while (matrices.length < targetCount && attempts < targetCount * 14) {
       attempts++;
       const g = groves[Math.floor(this.rand() * groves.length)];
       const a = this.rand() * Math.PI * 2;
-      const r = Math.sqrt(this.rand());
+      // Slightly denser toward cluster cores so pockets read as natural groves with organic gaps between them
+      const r = Math.pow(this.rand(), 0.62);
       const x = g.cx + Math.cos(a) * r * g.rx;
       const z = g.cz + Math.sin(a) * r * g.rz;
 
@@ -604,13 +639,13 @@ export class EnvironmentDetails {
         (this.rand() - 0.5) * 0.05
       );
       // Rich age/height distribution: mix of young understory spruces and tall towering elders
-      const sc = 0.65 + Math.pow(this.rand(), 0.85) * 1.25;
-      dummy.scale.set(sc * (0.88 + this.rand() * 0.28), sc * (0.92 + this.rand() * 0.36), sc * (0.88 + this.rand() * 0.28));
+      const sc = 0.62 + Math.pow(this.rand(), 0.82) * 1.32;
+      dummy.scale.set(sc * (0.86 + this.rand() * 0.28), sc * (0.94 + this.rand() * 0.36), sc * (0.86 + this.rand() * 0.28));
       dummy.updateMatrix();
       matrices.push(dummy.matrix.clone());
 
       const rRoll = this.rand();
-      tmpCol.copy(rRoll < 0.38 ? colA : rRoll < 0.74 ? colB : colC);
+      tmpCol.copy(rRoll < 0.30 ? colA : rRoll < 0.58 ? colB : rRoll < 0.82 ? colC : colD);
       tints.push(tmpCol.r, tmpCol.g, tmpCol.b);
     }
 
@@ -1038,18 +1073,27 @@ export class EnvironmentDetails {
   }
 
   buildValleyMist() {
-    // Delicate, moody atmospheric mountain & lake vapor wisps (subtle opacity so they add depth without creating bright white blobs!)
-    const mistTex = createSmokePuffTexture(128);
+    // Patchy, Artfully Scattered Nordic Mist Ribbons (localized wisps tucked in mountain saddles, pine woodland edges & lakeshore coves!)
+    // Deliberately leaves center vista & distant mountain peaks crisp — NEVER muddy or clumped together!
+    const mistTex = createWispyMistRibbonTexture(256, 128);
     this.mistSprites = [];
     const mistSpecs = [
-      { x: -175, y: 24, z: -265, sx: 260, sy: 54, speed: 1.1, opMult: 0.24 },
-      { x: 165, y: 26, z: -278, sx: 270, sy: 58, speed: -0.95, opMult: 0.24 },
-      { x: -10, y: 30, z: -335, sx: 310, sy: 62, speed: 0.78, opMult: 0.22 },
-      { x: -95, y: 12, z: -185, sx: 190, sy: 34, speed: 0.72, opMult: 0.22 },
-      { x: 95, y: 13, z: -190, sx: 195, sy: 36, speed: -0.68, opMult: 0.22 },
-      { x: 0, y: 10, z: -220, sx: 215, sy: 36, speed: 0.55, opMult: 0.2 },
-      { x: -45, y: 3.2, z: -98, sx: 130, sy: 16, speed: 0.62, opMult: 0.16 },
-      { x: 48, y: 3.4, z: -104, sx: 135, sy: 17, speed: -0.58, opMult: 0.16 }
+      // Left & right mountain flank valley ribbons (clear gap in center for aurora & peaks!)
+      { x: -195, y: 26, z: -275, sx: 235, sy: 44, speed: 0.95, opMult: 0.34 },
+      { x: 188, y: 28, z: -290, sx: 245, sy: 46, speed: -0.88, opMult: 0.34 },
+      { x: -125, y: 15, z: -205, sx: 165, sy: 28, speed: 0.72, opMult: 0.30 },
+      { x: 132, y: 16, z: -212, sx: 170, sy: 30, speed: -0.68, opMult: 0.30 },
+      // Patchy lakeside low-lying winter vapor wisps (here and there along shore coves)
+      { x: -64, y: 3.4, z: -96, sx: 108, sy: 15, speed: 0.58, opMult: 0.26 },
+      { x: 58, y: 3.6, z: -108, sx: 112, sy: 16, speed: -0.52, opMult: 0.26 },
+      { x: -12, y: 2.8, z: -144, sx: 96, sy: 13, speed: 0.44, opMult: 0.22 },
+      // Localized woodland-floor mist pockets drifting gently along left & right forest margins
+      { x: -56, y: 3.8, z: -24, sx: 78, sy: 13, speed: 0.42, opMult: 0.24 },
+      { x: 64, y: 4.0, z: -32, sx: 82, sy: 14, speed: -0.38, opMult: 0.24 },
+      { x: -48, y: 3.5, z: 34, sx: 72, sy: 12, speed: 0.35, opMult: 0.20 },
+      { x: 54, y: 3.8, z: 42, sx: 76, sy: 12, speed: -0.34, opMult: 0.20 },
+      { x: -84, y: 6.2, z: -148, sx: 120, sy: 20, speed: 0.50, opMult: 0.26 },
+      { x: 88, y: 6.5, z: -152, sx: 124, sy: 20, speed: -0.48, opMult: 0.26 }
     ];
 
     for (let i = 0; i < mistSpecs.length; i++) {
@@ -1083,14 +1127,20 @@ export class EnvironmentDetails {
     const phases = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-      // Evenly interleave large foreground crystalline flakes and fine mid-air flakes so drawRange scaling keeps rich flake variety at every intensity!
-      const isHeroLarge = (i % 5) === 0;
-      const spread = isHeroLarge ? 46 : 98;
+      // Subtle 3-tier circular snow orb sizes (fine dust / soft mid snow / gently larger bokeh orbs)
+      const mod = i % 6;
+      const isHeroLarge = mod === 0;
+      const isMid = mod === 1 || mod === 2;
+      const spread = isHeroLarge ? 48 : 98;
       positions[i * 3] = (this.rand() - 0.5) * spread;
       positions[i * 3 + 1] = this.rand() * (isHeroLarge ? 30 : 46);
       positions[i * 3 + 2] = (this.rand() - 0.5) * spread + (isHeroLarge ? 8 : 0);
-      speeds[i] = isHeroLarge ? (0.55 + this.rand() * 0.65) : (0.72 + this.rand() * 1.1);
-      sizes[i] = isHeroLarge ? (1.85 + this.rand() * 1.65) : (0.85 + this.rand() * 1.25);
+      speeds[i] = isHeroLarge ? (0.52 + this.rand() * 0.58) : (0.68 + this.rand() * 0.95);
+      sizes[i] = isHeroLarge
+        ? (1.45 + this.rand() * 0.72)
+        : isMid
+          ? (0.98 + this.rand() * 0.48)
+          : (0.62 + this.rand() * 0.36);
       phases[i] = this.rand() * Math.PI * 2;
     }
 
@@ -1101,7 +1151,7 @@ export class EnvironmentDetails {
     geo.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
     this.snowGeo = geo;
 
-    const snowTex = createSnowflakeTexture(128);
+    const snowTex = createSnowflakeTexture(96);
     this.snowMat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -1121,11 +1171,9 @@ export class EnvironmentDetails {
         uniform float uIntensity;
         uniform float uPixelRatio;
         varying float vAlpha;
-        varying float vRot;
 
         void main() {
           vec3 p = position;
-          // Higher snowfall intensity increases fall velocity and sweeping diagonal winter wind gusts
           float speedMult = 0.72 + uIntensity * 1.35;
           float windMult = 1.15 + uIntensity * 2.85;
           float fall = mod(p.y - uTime * (1.28 * aSpeed * speedMult), 46.0);
@@ -1135,12 +1183,11 @@ export class EnvironmentDetails {
           p.z += cos(uTime * 0.44 + aPhase * 1.3 + p.y * 0.11) * (1.1 + uIntensity * 1.2);
 
           vAlpha = smoothstep(-2.0, 2.5, p.y) * (1.0 - smoothstep(38.0, 44.0, p.y));
-          vRot = aPhase + uTime * (0.35 + fract(aPhase) * 0.55);
 
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
-          float sizeBoost = 1.2 + uIntensity * 0.75;
-          gl_PointSize = clamp((105.0 * aSize * sizeBoost * uPixelRatio) / max(1.0, -mvPosition.z), 2.2, 42.0);
+          float sizeBoost = 1.12 + uIntensity * 0.62;
+          gl_PointSize = clamp((92.0 * aSize * sizeBoost * uPixelRatio) / max(1.0, -mvPosition.z), 2.0, 28.0);
         }
       `,
       fragmentShader: /* glsl */ `
@@ -1149,15 +1196,9 @@ export class EnvironmentDetails {
         uniform vec3 uColor;
         uniform float uOpacity;
         varying float vAlpha;
-        varying float vRot;
 
         void main() {
-          // Gently rotate each crystalline snowflake as it tumbles in the winter air
-          vec2 uv = gl_PointCoord - 0.5;
-          float c = cos(vRot);
-          float s = sin(vRot);
-          uv = mat2(c, -s, s, c) * uv + 0.5;
-          vec4 tex = texture2D(uMap, uv);
+          vec4 tex = texture2D(uMap, gl_PointCoord);
           float a = tex.a * vAlpha * uOpacity;
           if (a < 0.01) discard;
           gl_FragColor = vec4(uColor, a);

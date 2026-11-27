@@ -20,7 +20,8 @@ export function createSoftGlowTexture(size = 128, innerColor = 'rgba(255,248,230
   return tex;
 }
 
-export function createSnowflakeTexture(size = 128) {
+// Pure Soft Circular Bokeh Snow Orb Texture (zero 6-point pattern; dreamy photographic snow dots!)
+export function createSnowflakeTexture(size = 96) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -28,45 +29,154 @@ export function createSnowflakeTexture(size = 128) {
   const c = size / 2;
   ctx.clearRect(0, 0, size, size);
 
-  // Soft outer winter bokeh halo so large foreground snowflakes feel dreamy and photographic
   const grad = ctx.createRadialGradient(c, c, 0, c, c, c);
-  grad.addColorStop(0.0, 'rgba(255,255,255,0.96)');
-  grad.addColorStop(0.32, 'rgba(240,248,255,0.72)');
-  grad.addColorStop(0.68, 'rgba(218,236,255,0.22)');
-  grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+  grad.addColorStop(0.32, 'rgba(246,251,255,0.88)');
+  grad.addColorStop(0.62, 'rgba(220,238,255,0.34)');
+  grad.addColorStop(0.86, 'rgba(198,224,252,0.08)');
+  grad.addColorStop(1.0, 'rgba(198,224,252,0)');
   ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(c, c, c, 0, Math.PI * 2);
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Elongated Silky Mountain & Woodland Mist Ribbon Texture (horizontal feathery wisps, NEVER round white blobs!)
+export function createWispyMistRibbonTexture(width = 256, height = 128) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+
+  const wisps = [
+    { x: 0.5, y: 0.54, rx: 0.44, ry: 0.24, a: 0.26 },
+    { x: 0.34, y: 0.48, rx: 0.3, ry: 0.18, a: 0.2 },
+    { x: 0.68, y: 0.56, rx: 0.28, ry: 0.16, a: 0.19 },
+    { x: 0.46, y: 0.42, rx: 0.26, ry: 0.13, a: 0.15 },
+    { x: 0.6, y: 0.62, rx: 0.22, ry: 0.12, a: 0.14 }
+  ];
+
+  for (const w of wisps) {
+    ctx.save();
+    ctx.translate(width * w.x, height * w.y);
+    ctx.scale(1, w.ry / w.rx);
+    const rad = width * w.rx;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
+    g.addColorStop(0.0, `rgba(225, 238, 252, ${w.a})`);
+    g.addColorStop(0.48, `rgba(195, 218, 244, ${w.a * 0.46})`);
+    g.addColorStop(0.82, `rgba(170, 200, 235, ${w.a * 0.12})`);
+    g.addColorStop(1.0, 'rgba(170, 200, 235, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, rad, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Luxury Nordic Crimson Velvet & Gold Fair-Isle Woven Circular Christmas Tree Skirt Carpet Texture
+export function createTreeSkirtTexture(size = 512) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const c = size / 2;
+  ctx.clearRect(0, 0, size, size);
+
+  // Outer soft scalloped carpet silhouette
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(c, c, c * 0.94, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Deep plush ruby-crimson velvet radial base
+  const bg = ctx.createRadialGradient(c, c, c * 0.08, c, c, c * 0.94);
+  bg.addColorStop(0.0, '#4f0915');
+  bg.addColorStop(0.32, '#731020');
+  bg.addColorStop(0.72, '#8b1628');
+  bg.addColorStop(0.92, '#690f1e');
+  bg.addColorStop(1.0, '#4d0a15');
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, size, size);
 
-  // Delicate 6-pointed crystalline dendritic arms visible on larger flakes
-  ctx.save();
-  ctx.translate(c, c);
-  ctx.strokeStyle = 'rgba(255,255,255,0.88)';
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 6; i++) {
-    ctx.rotate(Math.PI / 3);
-    ctx.lineWidth = size * 0.026;
+  // Subtle woven fabric radial knit texture lines
+  ctx.strokeStyle = 'rgba(255, 224, 170, 0.045)';
+  ctx.lineWidth = 1.2;
+  for (let r = 24; r < c * 0.92; r += 9) {
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, -c * 0.78);
+    ctx.arc(c, c, r, 0, Math.PI * 2);
     ctx.stroke();
-
-    // Fine crystalline side branches
-    ctx.lineWidth = size * 0.017;
-    for (const frac of [0.36, 0.58]) {
-      const y = -c * frac;
-      const bLen = c * (0.26 - frac * 0.14);
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(-bLen * 0.75, y - bLen * 0.65);
-      ctx.moveTo(0, y);
-      ctx.lineTo(bLen * 0.75, y - bLen * 0.65);
-      ctx.stroke();
-    }
   }
+
+  // Ornate Nordic gold concentric embroidery rings
+  const drawRing = (r, lw, color) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.arc(c, c, r, 0, Math.PI * 2);
+    ctx.stroke();
+  };
+  drawRing(c * 0.89, 5.5, '#e8c474');
+  drawRing(c * 0.85, 1.8, 'rgba(252, 232, 182, 0.78)');
+  drawRing(c * 0.69, 2.4, 'rgba(235, 198, 118, 0.72)');
+  drawRing(c * 0.66, 1.2, 'rgba(255, 240, 200, 0.55)');
+  drawRing(c * 0.42, 1.6, 'rgba(232, 194, 114, 0.45)');
+
+  // Scandinavian Fair-Isle diamond & 8-point winter star motifs woven around the outer border band
+  const motifCount = 24;
+  for (let i = 0; i < motifCount; i++) {
+    const a = (i / motifCount) * Math.PI * 2;
+    const mr = c * 0.77;
+    const mx = c + Math.cos(a) * mr;
+    const my = c + Math.sin(a) * mr;
+
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(a + Math.PI / 2);
+
+    // Cream-gold woven diamond star
+    ctx.fillStyle = i % 2 === 0 ? '#f6e4bc' : '#e6bd68';
+    ctx.beginPath();
+    ctx.moveTo(0, -10);
+    ctx.lineTo(6.5, 0);
+    ctx.lineTo(0, 10);
+    ctx.lineTo(-6.5, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner crimson jewel dot
+    ctx.fillStyle = '#7c1222';
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Soft ivory-plush faux-fur trim around outer rim + delicate snow dusting
+  const furRim = ctx.createRadialGradient(c, c, c * 0.87, c, c, c * 0.95);
+  furRim.addColorStop(0.0, 'rgba(248, 240, 224, 0)');
+  furRim.addColorStop(0.45, 'rgba(248, 242, 230, 0.88)');
+  furRim.addColorStop(0.85, 'rgba(236, 230, 218, 0.96)');
+  furRim.addColorStop(1.0, 'rgba(210, 215, 226, 0.75)');
+  ctx.fillStyle = furRim;
+  ctx.beginPath();
+  ctx.arc(c, c, c * 0.95, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
   return tex;
 }
 

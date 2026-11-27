@@ -12,6 +12,7 @@ import { NordicTerrain } from './scene/terrain.js';
 import { FjordWater } from './scene/water.js';
 import { NorwegianCabins } from './scene/cabins.js';
 import { LuxuryChristmasTree } from './scene/christmasTree.js';
+import { NordicSnowmanFamily } from './scene/snowmanFamily.js';
 import { EnvironmentDetails } from './scene/environmentDetails.js';
 import { CinematicCameraRig } from './scene/cameraRig.js';
 import { MagicParticles } from './scene/magicParticles.js';
@@ -88,6 +89,7 @@ function initNordicChristmas() {
   const fjordWater = new FjordWater(scene, perf);
   const cabins = new NorwegianCabins(scene);
   const christmasTree = new LuxuryChristmasTree(scene, perf);
+  const snowmanFamily = new NordicSnowmanFamily(scene);
   const envDetails = new EnvironmentDetails(scene, perf);
   const magicParticles = new MagicParticles(scene, perf.isMobile ? 1600 : 3600);
   const cameraRig = new CinematicCameraRig(camera, renderer.domElement);
@@ -149,7 +151,8 @@ function initNordicChristmas() {
     cameraRig,
     audioEngine,
     giftCardModal,
-    wishCardStudio
+    wishCardStudio,
+    snowmanFamily
   });
 
   const ui = new ControlsUI({
@@ -269,6 +272,7 @@ function initNordicChristmas() {
     fjordWater.update(elapsed, dayState);
     cabins.update(elapsed, dt, dayState);
     christmasTree.update(elapsed, dt, dayState);
+    snowmanFamily.update(elapsed, dt, dayState);
     envDetails.update(elapsed, dt, dayState);
     magicParticles.update(elapsed, dt);
     ui.updateTimeDisplay(dayState);

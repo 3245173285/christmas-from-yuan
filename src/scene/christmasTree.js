@@ -8,6 +8,7 @@ import {
   createPineSprigTexture,
   createSoftGlowTexture,
   createTreeContactShadowTexture,
+  createTreeSkirtTexture,
   createVelvetNormalBump
 } from '../utils/textures.js';
 
@@ -541,9 +542,42 @@ export class LuxuryChristmasTree {
       polygonOffsetFactor: -1
     });
     const contactShadow = new THREE.Mesh(contactShadowGeo, contactShadowMat);
-    contactShadow.position.y = 0.06;
+    contactShadow.position.y = 0.04;
     contactShadow.renderOrder = 2;
     this.group.add(contactShadow);
+
+    // Luxury Nordic Crimson-Velvet & Gold Fair-Isle Woven Circular Christmas Tree Skirt Carpet!
+    const skirtRadius = 4.65;
+    const skirtGeo = new THREE.CircleGeometry(skirtRadius, 48);
+    skirtGeo.rotateX(-Math.PI / 2);
+    const baseTerrainY = getTerrainHeight(0, 0);
+    const sPos = skirtGeo.attributes.position;
+    for (let i = 0; i < sPos.count; i++) {
+      const lx = sPos.getX(i);
+      const lz = sPos.getZ(i);
+      const wx = lx * this.treeScale;
+      const wz = lz * this.treeScale;
+      const localH = (getTerrainHeight(wx, wz) - baseTerrainY) / this.treeScale;
+      // Gentle plush cushion dome tapering gracefully into the snow at the outer fur trim
+      const rNorm = Math.min(1, Math.hypot(lx, lz) / skirtRadius);
+      const plushLift = 0.055 + (1 - rNorm * rNorm) * 0.04;
+      sPos.setY(i, localH + plushLift);
+    }
+    skirtGeo.computeVertexNormals();
+
+    const skirtTex = createTreeSkirtTexture(512);
+    const skirtMat = new THREE.MeshStandardMaterial({
+      map: skirtTex,
+      transparent: true,
+      alphaTest: 0.15,
+      roughness: 0.86,
+      metalness: 0.08,
+      polygonOffset: true,
+      polygonOffsetFactor: -2
+    });
+    const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
+    skirtMesh.receiveShadow = true;
+    this.group.add(skirtMesh);
   }
 
   buildPineNeedles(targetCount, scaleBoost = 1.0, castShadow = true) {

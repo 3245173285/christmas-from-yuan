@@ -17,7 +17,8 @@ export class InteractionManager {
     cameraRig,
     audioEngine,
     giftCardModal,
-    wishCardStudio
+    wishCardStudio,
+    snowmanFamily
   }) {
     this.camera = camera;
     this.domElement = domElement;
@@ -28,6 +29,7 @@ export class InteractionManager {
     this.audio = audioEngine;
     this.giftModal = giftCardModal;
     this.wishStudio = wishCardStudio;
+    this.snowman = snowmanFamily;
 
     this.raycaster = new THREE.Raycaster();
     this.ndc = new THREE.Vector2();
@@ -116,7 +118,18 @@ export class InteractionManager {
     }
     this.tree.setStarHovered(false);
 
-    // 3. Check Hover over Tree Ornaments
+    // 3. Check Hover over Snowman Family
+    if (this.snowman) {
+      const snowHits = this.raycaster.intersectObject(this.snowman.getHitMesh(), false);
+      if (snowHits.length > 0) {
+        this.snowman.setHovered(true);
+        this.domElement.style.cursor = 'pointer';
+        return;
+      }
+      this.snowman.setHovered(false);
+    }
+
+    // 4. Check Hover over Tree Ornaments
     const ornHits = this.raycaster.intersectObjects(this.tree.ornamentMeshes, false);
     if (ornHits.length > 0) {
       this.domElement.style.cursor = 'pointer';
@@ -180,6 +193,17 @@ export class InteractionManager {
       this.particles.emitStarCascade(starPos);
       this.audio.playStarCascade();
       return;
+    }
+
+    // Priority 2.5: Interactive Snowman Family -> Joyful Wobble Dance + Snow Sparkle Burst + Chime!
+    if (this.snowman) {
+      const snowHits = this.raycaster.intersectObject(this.snowman.getHitMesh(), false);
+      if (snowHits.length > 0) {
+        const pos = this.snowman.triggerDance();
+        this.particles.emitOrnamentChime(pos);
+        this.audio.playOrnamentNote(0.84);
+        return;
+      }
     }
 
     // Priority 3: Hanging Ornaments (direct hit OR generous nearest-bauble snap on tree body!)
