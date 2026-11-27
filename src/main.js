@@ -17,6 +17,7 @@ import { EnvironmentDetails } from './scene/environmentDetails.js';
 import { FestiveMeadow } from './scene/festiveMeadow.js';
 import { DistantLandscape } from './scene/distantLandscape.js';
 import { createSurfaceSampler, clearOccupiedDetails } from './scene/detailGeometry.js';
+import { partitionStaticInstances } from './utils/geometryOptimization.js';
 import { CinematicCameraRig } from './scene/cameraRig.js';
 import { MagicParticles } from './scene/magicParticles.js';
 import { InteractionManager } from './scene/interactionManager.js';
@@ -99,6 +100,7 @@ function initNordicChristmas() {
   const distantLandscape = new DistantLandscape(scene, surface, terrain.mesh.material);
   clearOccupiedDetails(envDetails.group,
     [...festiveMeadow.clearAreas, ...distantLandscape.clearAreas], distantLandscape.clearRoutes);
+  partitionStaticInstances(envDetails.group);
   const magicParticles = new MagicParticles(scene, perf.isMobile ? 1600 : 3600);
   const cameraRig = new CinematicCameraRig(camera, renderer.domElement);
   const audioEngine = new NordicAudioEngine();
@@ -262,7 +264,10 @@ function initNordicChristmas() {
     if (renderer.shadowMap.enabled) {
       curLightDir.copy(dayNight.keyLight.position).normalize();
       const isTransitioning = dayNight.targetHours !== null;
-      if (!hasBakedInitialShadow || isTransitioning || curLightDir.distanceToSquared(lastShadowLightDir) > 0.0000008) {
+      // Coalesce sub-texel angular changes; keep the more sensitive horizon
+      // update and immediate preset transitions. Map resolution stays 2048.
+      const shadowStep = 0.00145 + Math.abs(curLightDir.y) * 0.00075;
+      if (!hasBakedInitialShadow || isTransitioning || curLightDir.distanceToSquared(lastShadowLightDir) > shadowStep * shadowStep) {
         lastShadowLightDir.copy(curLightDir);
         renderer.shadowMap.needsUpdate = true;
         hasBakedInitialShadow = true;

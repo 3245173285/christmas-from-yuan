@@ -7,7 +7,7 @@ const KEYFRAMES = [
   {
     hour: 0.0,
     phase: 'Aurora Night',
-    phaseZh: '极光午夜',
+    phaseZh: '������ҹ',
     skyZenith: new THREE.Color('#040814'),
     skyMid: new THREE.Color('#081428'),
     skyHorizon: new THREE.Color('#10233d'),
@@ -33,7 +33,7 @@ const KEYFRAMES = [
   {
     hour: 4.5,
     phase: 'Deep Night',
-    phaseZh: '静谧深夜',
+    phaseZh: '������ҹ',
     skyZenith: new THREE.Color('#050918'),
     skyMid: new THREE.Color('#0b1730'),
     skyHorizon: new THREE.Color('#172947'),
@@ -59,7 +59,7 @@ const KEYFRAMES = [
   {
     hour: 6.5,
     phase: 'Nordic Dawn',
-    phaseZh: '拂晓薄雾',
+    phaseZh: '��������',
     skyZenith: new THREE.Color('#272b56'),
     skyMid: new THREE.Color('#7a557c'),
     skyHorizon: new THREE.Color('#e89ba0'),
@@ -85,7 +85,7 @@ const KEYFRAMES = [
   {
     hour: 9.0,
     phase: 'Golden Morning',
-    phaseZh: '清晨暖阳',
+    phaseZh: '�峿ů��',
     skyZenith: new THREE.Color('#245799'),
     skyMid: new THREE.Color('#6fa0cf'),
     skyHorizon: new THREE.Color('#f2d6b3'),
@@ -111,7 +111,7 @@ const KEYFRAMES = [
   {
     hour: 13.0,
     phase: 'Crisp Midday',
-    phaseZh: '清澈正午',
+    phaseZh: '�峺����',
     skyZenith: new THREE.Color('#1a55a8'),
     skyMid: new THREE.Color('#5a9be0'),
     skyHorizon: new THREE.Color('#cde2f5'),
@@ -137,7 +137,7 @@ const KEYFRAMES = [
   {
     hour: 16.5,
     phase: 'Golden Hour',
-    phaseZh: '黄金时刻',
+    phaseZh: '�ƽ�ʱ��',
     skyZenith: new THREE.Color('#21457d'),
     skyMid: new THREE.Color('#966d7e'),
     skyHorizon: new THREE.Color('#f59a56'),
@@ -163,7 +163,7 @@ const KEYFRAMES = [
   {
     hour: 18.8,
     phase: 'Blue Hour',
-    phaseZh: '蓝调时刻',
+    phaseZh: '����ʱ��',
     skyZenith: new THREE.Color('#0c1b44'),
     skyMid: new THREE.Color('#342a62'),
     skyHorizon: new THREE.Color('#cc6156'),
@@ -189,7 +189,7 @@ const KEYFRAMES = [
   {
     hour: 21.0,
     phase: 'Aurora Night',
-    phaseZh: '极光夜景',
+    phaseZh: '����ҹ��',
     skyZenith: new THREE.Color('#040917'),
     skyMid: new THREE.Color('#09162e'),
     skyHorizon: new THREE.Color('#122745'),
@@ -215,7 +215,7 @@ const KEYFRAMES = [
   {
     hour: 24.0,
     phase: 'Aurora Night',
-    phaseZh: '极光午夜',
+    phaseZh: '������ҹ',
     skyZenith: new THREE.Color('#040814'),
     skyMid: new THREE.Color('#081428'),
     skyHorizon: new THREE.Color('#10233d'),
@@ -247,7 +247,6 @@ function smoothLerp(a, b, t) {
 
 function buildProceduralEnvMap(renderer, config) {
   const pmrem = new THREE.PMREMGenerator(renderer);
-  pmrem.compileEquirectangularShader();
 
   const envScene = new THREE.Scene();
 
@@ -358,16 +357,9 @@ export class DayNightSystem {
     this.fog = new THREE.FogExp2('#0c192e', 0.0023);
     scene.fog = this.fog;
 
-    // Pre-generate 3 procedural PMREM environment maps (night/aurora, twilight, day)
+    // The renderer has always used the single balanced twilight map for every
+    // time of day. Bake that exact map once instead of generating two unused PMREMs.
     this.envMaps = {
-      night: buildProceduralEnvMap(renderer, {
-        top: '#071024',
-        mid: '#142947',
-        bot: '#0a121d',
-        accent: '#32d99b',
-        warmSpot: '#ffcf86',
-        sparkleColor: '#ffe0a8'
-      }),
       twilight: buildProceduralEnvMap(renderer, {
         top: '#1d2452',
         mid: '#9b5f73',
@@ -375,24 +367,16 @@ export class DayNightSystem {
         accent: '#f09168',
         warmSpot: '#ffd59c',
         sparkleColor: '#ffe5bd'
-      }),
-      day: buildProceduralEnvMap(renderer, {
-        top: '#2463b8',
-        mid: '#9ac6ee',
-        bot: '#384c3a',
-        accent: '#eef6ff',
-        warmSpot: '#fff4df',
-        sparkleColor: '#ffffff'
       })
     };
-    this.currentEnvKey = 'night';
-    scene.environment = this.envMaps.night;
+    this.currentEnvKey = 'twilight';
+    scene.environment = this.envMaps.twilight;
 
     // Output interpolated state read by sky, water, tree, cabins, mist
     this.state = {
       hour: this.timeHours,
       phase: 'Aurora Night',
-      phaseZh: '极光夜景',
+      phaseZh: '����ҹ��',
       skyZenith: new THREE.Color(),
       skyMid: new THREE.Color(),
       skyHorizon: new THREE.Color(),
@@ -430,6 +414,7 @@ export class DayNightSystem {
   }
 
   update(dt) {
+    if(this.paused&&this.targetHours===null)return this.state;
     if (this.targetHours !== null) {
       let diff = this.targetHours - this.timeHours;
       if (diff > 12) diff -= 24;

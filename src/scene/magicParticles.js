@@ -13,6 +13,8 @@ export class MagicParticles {
     this.scene = scene;
     this.maxCount = maxCount;
     this.cursor = 0;
+    this.activeSlots = new Set();
+    this.particleAppearanceDirty = false;
 
     this.positions = new Float32Array(maxCount * 3);
     this.velocities = new Float32Array(maxCount * 3);
@@ -88,6 +90,8 @@ export class MagicParticles {
 
     this.points = new THREE.Points(this.geo, this.mat);
     this.points.frustumCulled = false;
+    this.points.visible = false;
+    this.geo.setDrawRange(0,0);
     scene.add(this.points);
 
     // 3 Glowing Orbiting Fairy-Comet Head Sprites leading the top-to-bottom spirals!
@@ -114,6 +118,8 @@ export class MagicParticles {
   spawnParticle(x, y, z, vx, vy, vz, r, g, b, size, life, gravity = -1.6, drag = 0.985, swirl = 0) {
     const i = this.cursor;
     this.cursor = (this.cursor + 1) % this.maxCount;
+    this.activeSlots.add(i);
+    this.particleAppearanceDirty = true;
 
     this.positions[i * 3] = x;
     this.positions[i * 3 + 1] = y;
@@ -412,14 +418,16 @@ export class MagicParticles {
     const lifeRatioAttr = this.geo.attributes.aLifeRatio;
     const lifeArr = lifeRatioAttr.array;
 
-    let anyActive = false;
-    for (let i = 0; i < this.maxCount; i++) {
+    let first=this.maxCount,last=-1;
+    for (const i of this.activeSlots) {
       if (this.ages[i] >= this.lifetimes[i]) {
         lifeArr[i] = 1.0;
         this.sizes[i] = 0;
+        this.activeSlots.delete(i);
+        this.particleAppearanceDirty = true;
         continue;
       }
-      anyActive = true;
+      first=Math.min(first,i);last=Math.max(last,i);
       this.ages[i] += dt;
       const ratio = Math.min(1.0, this.ages[i] / this.lifetimes[i]);
       lifeArr[i] = ratio;
@@ -444,11 +452,16 @@ export class MagicParticles {
       this.positions[idx + 2] += this.velocities[idx + 2] * dt;
     }
 
-    if (anyActive) {
+    this.points.visible = last>=first;
+    this.geo.setDrawRange(this.points.visible?first:0,this.points.visible?last-first+1:0);
+    if (this.points.visible) {
       this.geo.attributes.position.needsUpdate = true;
-      this.geo.attributes.aColor.needsUpdate = true;
-      this.geo.attributes.aSize.needsUpdate = true;
       lifeRatioAttr.needsUpdate = true;
+    }
+    if(this.particleAppearanceDirty){
+      this.geo.attributes.aColor.needsUpdate=true;
+      this.geo.attributes.aSize.needsUpdate=true;
+      this.particleAppearanceDirty=false;
     }
   }
 }

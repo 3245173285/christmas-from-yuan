@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CABIN_SITES, getTerrainHeight, WATER_LEVEL } from '../utils/noise.js';
 import { createSmokePuffTexture, createWoodPlankTexture } from '../utils/textures.js';
+import { indexedClone } from '../utils/geometryOptimization.js';
 
 // Picturesque Clustered Norwegian Fjord Village (15 diverse buildings + village chapel spire + warm streetlamps)
 // Archetypes: village_church, rorbu_pier, townhouse, boathouse, grand_lodge, aframe, cottage
@@ -479,7 +480,7 @@ export class NorwegianCabins {
       g.add(sn);
     }
 
-    // Grand Front Square Bell Tower (钟楼) rising cleanly from the front entrance
+    // Grand Front Square Bell Tower (��¥) rising cleanly from the front entrance
     const towerLower = new THREE.Mesh(new THREE.BoxGeometry(3.15, 6.8, 3.15), m.ivory);
     towerLower.position.set(0, 7.6, 2.85);
     towerLower.castShadow = true;
@@ -511,7 +512,7 @@ export class NorwegianCabins {
     addClock(1.6, 9.45, 2.85, Math.PI / 2);
     addClock(-1.6, 9.45, 2.85, -Math.PI / 2);
 
-    // Open Glowing Belfry Gallery (钟室) with 4 corner pillars + suspended bronze church bell!
+    // Open Glowing Belfry Gallery (����) with 4 corner pillars + suspended bronze church bell!
     const belfryY = 12.25;
     for (const bx of [-1.28, 1.28]) {
       for (const bz of [1.57, 4.13]) {
@@ -769,7 +770,7 @@ export class NorwegianCabins {
     return { group: g, chimneyLocal: new THREE.Vector3(-2.0, 6.25, -1.0) };
   }
 
-  // Dramatic Scandinavian A-Frame Chalet with glowing triangular glass façade
+  // Dramatic Scandinavian A-Frame Chalet with glowing triangular glass fa?ade
   buildAFrameChalet(winMat) {
     const g = new THREE.Group();
     const m = this.mats;
@@ -1034,8 +1035,7 @@ export class NorwegianCabins {
       if (Array.isArray(obj.material)) return;
 
       const mat = obj.material;
-      let geom = obj.geometry.clone();
-      if (geom.index) geom = geom.toNonIndexed();
+      const geom = indexedClone(obj.geometry);
       geom.applyMatrix4(obj.matrixWorld);
 
       if (!geom.attributes.normal) geom.computeVertexNormals();

@@ -3,6 +3,7 @@ import { GIFT_CARDS } from '../data/giftCards.js';
 import { CARD_STYLE_MAP } from '../data/wishCardsConfig.js';
 import { createGiftInterior } from './giftMiniatures.js';
 import { TreeDetails } from './treeDetails.js';
+import { batchStaticMeshes } from '../utils/geometryOptimization.js';
 import { getTerrainHeight, mulberry32 } from '../utils/noise.js';
 import {
   createBarkTexture,
@@ -1511,6 +1512,17 @@ export class LuxuryChristmasTree {
       }
     }
 
+    // Keep opening pivots, hit targets and miniature interiors independent.
+    // Fuse the fixed opaque shell and decorative packages by exact material
+    // and shadow flags rather than drawing every little ribbon and bow.
+    const movingGiftParts = new Set();
+    for (const g of this.specialGifts) {
+      movingGiftParts.add(g.lidPivot);
+      movingGiftParts.add(g.interiorObj.interior);
+      movingGiftParts.add(g.hitMesh);
+      batchStaticMeshes(g.lidPivot);
+    }
+    batchStaticMeshes(giftGroup, movingGiftParts);
     this.group.add(giftGroup);
   }
 

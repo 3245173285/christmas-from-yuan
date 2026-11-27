@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getTerrainHeight } from '../utils/noise.js';
 import { createSoftGlowTexture } from '../utils/textures.js';
+import { batchStaticMeshes } from '../utils/geometryOptimization.js';
 
 // Charming Interactive Nordic Snowman Family (Papa Snowman with warm lantern + Baby Snowman with knit beanie)
 // Lightweight geometry, zero extra PointLights (uses emissive glass + additive halo), joyful wobble & snow burst on click!
@@ -45,6 +46,9 @@ export class NordicSnowmanFamily {
     this.babyPivot.position.set(1.22, -0.02, 0.32);
     this.babyPivot.rotation.y = -0.34;
     this.group.add(this.babyPivot);
+    batchStaticMeshes(this.lanternGroup);
+    batchStaticMeshes(this.papaPivot, new Set([this.lanternGroup]));
+    batchStaticMeshes(this.babyPivot);
 
     // Soft grounded contact shadow beneath the snowman duo
     const shadowTex = createSoftGlowTexture(128, 'rgba(8,16,30,0.48)', 'rgba(8,16,30,0.18)');

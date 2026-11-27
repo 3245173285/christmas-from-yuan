@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { fbm2D, ridged2D, getTerrainHeight, smoothstep, mulberry32, WATER_LEVEL } from '../utils/noise.js';
 import { getSharedNoiseLUTTexture } from '../utils/textures.js';
 import { primitives as P, v3, standard, part, beam, tube, extrude, bake, instanceTemplate, matrixAt } from './detailGeometry.js';
-import { buildRockCascade, buildDetailedLighthouse, LIGHTHOUSE } from './coastalDetails.js';
+import { buildDetailedLighthouse, LIGHTHOUSE } from './coastalDetails.js';
+import { buildAlpineWaterfall } from './alpineWaterfall.js';
 
 export const ISLAND = {x:44,z:-87,rx:11.5,rz:8.7};
 const HILL_CABINS = [[-84,-177,.62,1.14],[-100,-196,-.86,1.04],[-64,-201,.26,.96]];
@@ -27,7 +28,7 @@ export class DistantLandscape {
     this.green=standard('#294739');this.green2=standard('#3b5848');this.frostGreen=standard('#92a99e');
     this.buildFarRanges(terrainMaterial);
     this.buildMountainMist();
-    this.cascade=buildRockCascade(this.group,this.static,this.clearAreas,this.surface);
+    this.cascade=buildAlpineWaterfall(this.group,this.surface,this.clearAreas);
     this.buildIsland();this.buildHillside();
     this.lighthouse=buildDetailedLighthouse(this);
     this.buildSkyCameo();

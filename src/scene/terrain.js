@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { fbm2D, getPathFactor, getTerrainHeight, smoothstep, WATER_LEVEL } from '../utils/noise.js';
 import { createBakedTerrainDetailTexture } from '../utils/textures.js';
+import { splitTerrainGeometry } from '../utils/geometryOptimization.js';
+import { sculptAlpineFall } from '../utils/alpineFallLayout.js';
 
 // Pre-Baked High-Speed Photorealistic Nordic Terrain:
 // Uses a startup-baked seamless RGBA detail texture (Crags / Fine Granite / Snow-Melt / Micro-Grain)
@@ -18,7 +20,7 @@ export class NordicTerrain {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-      pos.setY(i, getTerrainHeight(x, z));
+      pos.setY(i, sculptAlpineFall(x,z,getTerrainHeight(x,z)));
     }
     geo.computeVertexNormals();
 
@@ -254,9 +256,14 @@ export class NordicTerrain {
       #include <fog_fragment>`);
     };
 
-    this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.receiveShadow = true;
-    this.mesh.castShadow = !perf.isMobile;
+    this.mesh = new THREE.Group();
+    this.mesh.material = mat;
+    for (const tile of splitTerrainGeometry(geo,segs)) {
+      const mesh=new THREE.Mesh(tile,mat);
+      mesh.receiveShadow=true;mesh.castShadow=!perf.isMobile;
+      this.mesh.add(mesh);
+    }
+    geo.dispose();
     scene.add(this.mesh);
   }
 

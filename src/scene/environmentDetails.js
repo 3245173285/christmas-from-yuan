@@ -100,7 +100,7 @@ function createMossySnowRockGeometry() {
   return geo;
 }
 
-// Optimized Realistic Volumetric Multi-Frond Norway Spruce Crown (28 layered radial boughs × 2 tris = 56 tris; 5.7× lighter than 320-tri!)
+// Optimized Realistic Volumetric Multi-Frond Norway Spruce Crown (28 layered radial boughs �� 2 tris = 56 tris; 5.7�� lighter than 320-tri!)
 function createVolumetricSpruceCrownGeometry() {
   const rand = mulberry32(314159);
   const allPos = [];
@@ -279,6 +279,9 @@ export class EnvironmentDetails {
     this.isMobile = Boolean(perf.isMobile);
     this.windTime = { value: 0 };
     this.snowCoverUniform = { value: 0.92 };
+    this.whiteSnowTint = new THREE.Color('#ffffff');
+    this.mistTint = new THREE.Color();
+    this.moonlitSilver = new THREE.Color('#a8c8e6');
     this.snowEnabled = true;
     this.snowIntensity = 0.48; // 0.1 = gentle light snow, 0.48 = medium festive snow, 1.0 = heavy Nordic snowfall
     this.maxSnowCount = perf.snowCount;
@@ -330,14 +333,14 @@ export class EnvironmentDetails {
          uniform float uTime;
          uniform float uSnowCover;
          varying float vClumpV;
-         varying vec2 vWorldXZ;`
+         varying float vGrassPatch;`
       );
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
          vec4 instW = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
          vClumpV = uv.y;
-         vWorldXZ = instW.xz;
+         vGrassPatch = fract(sin(dot(floor(instW.xz * 0.2), vec2(127.1, 311.7))) * 43758.5453);
          // Snow gently settles over grass clumps at night, lowering height so only graceful frosted tips peek through snowdrifts!
          float snowSink = 1.0 - uSnowCover * 0.42;
          transformed.y *= snowSink;
@@ -352,13 +355,13 @@ export class EnvironmentDetails {
         `#include <common>
          uniform float uSnowCover;
          varying float vClumpV;
-         varying vec2 vWorldXZ;`
+         varying float vGrassPatch;`
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <color_fragment>',
         `#include <color_fragment>
          // Natural diurnal grass thawing: lush alpine green at midday, soft rime at dawn/dusk, snowy white at night!
-         float patchN = fract(sin(dot(floor(vWorldXZ * 0.2), vec2(127.1, 311.7))) * 43758.5453);
+         float patchN = vGrassPatch;
          float snowBlend = smoothstep(0.40, 0.92, uSnowCover + (vClumpV - 0.45) * 0.16 + (patchN - 0.5) * 0.12) * smoothstep(0.28, 0.56, uSnowCover);
          vec3 meadowRich = diffuseColor.rgb * vec3(0.72, 0.92, 0.66);
          vec3 frostSnow = vec3(0.78, 0.85, 0.93);
@@ -562,7 +565,7 @@ export class EnvironmentDetails {
       { cx: -38, cz: -162, rx: 38, rz: 24 },
       { cx: 2, cz: -172, rx: 30, rz: 20 },
       { cx: 42, cz: -165, rx: 38, rz: 24 },
-      // Southern wooded pockets behind the open meadow (natural rhythm on 360° orbit)
+      // Southern wooded pockets behind the open meadow (natural rhythm on 360�� orbit)
       { cx: -58, cz: 54, rx: 32, rz: 28 },
       { cx: 62, cz: 56, rx: 32, rz: 28 },
       { cx: -14, cz: 88, rx: 36, rz: 26 },
@@ -1284,11 +1287,10 @@ export class EnvironmentDetails {
     this.snowMat.uniforms.uTime.value = elapsedTime;
     this.snowPoints.visible = this.snowMat.uniforms.uOpacity.value > 0.005;
 
-    this.snowMat.uniforms.uColor.value.copy(dayState.cloudTint).lerp(new THREE.Color('#ffffff'), 0.72);
+    this.snowMat.uniforms.uColor.value.copy(dayState.cloudTint).lerp(this.whiteSnowTint, 0.72);
 
-    const mistTint = new THREE.Color().copy(dayState.skyHorizon).lerp(dayState.cloudTint, 0.45);
-    const moonlitSilver = new THREE.Color('#a8c8e6');
-    mistTint.lerp(moonlitSilver, 0.38 + dayState.starIntensity * 0.16);
+    const mistTint = this.mistTint.copy(dayState.skyHorizon).lerp(dayState.cloudTint, 0.45);
+    mistTint.lerp(this.moonlitSilver, 0.38 + dayState.starIntensity * 0.16);
     for (const m of this.mistSprites) {
       m.sprite.position.x = m.baseX + Math.sin(elapsedTime * 0.042 * m.speed + m.phase) * 26.0;
       m.mat.opacity = Math.min(0.46, Math.max(0.14, dayState.mistOpacity * m.opMult));

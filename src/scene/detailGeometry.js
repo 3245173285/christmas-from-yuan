@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getTerrainHeight } from '../utils/noise.js';
+import { indexedClone } from '../utils/geometryOptimization.js';
+import { sculptAlpineFall } from '../utils/alpineFallLayout.js';
 
 // Small procedural assets share primitive geometry, then bake by material. No new lights,
 // external files or per-piece draw calls are required for the static scenery.
@@ -43,7 +45,7 @@ export function bake(group, { shadow = false, receive = true } = {}) {
   const byMaterial = new Map();
   group.traverse(obj => {
     if (!obj.isMesh) return;
-    const g = obj.geometry.index ? obj.geometry.toNonIndexed() : obj.geometry.clone();
+    const g = indexedClone(obj.geometry);
     for (const key of Object.keys(g.attributes)) if (!['position','normal','uv'].includes(key)) g.deleteAttribute(key);
     if (!g.attributes.uv) g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2),2));
     if (!g.attributes.normal) g.computeVertexNormals();
@@ -82,7 +84,10 @@ export function createSurfaceSampler(perf) {
   const step = 1140/n, cache = new Map();
   function at(ix,iz) {
     const key = iz*(n+1)+ix;
-    if (!cache.has(key)) cache.set(key,getTerrainHeight(ix*step-570,iz*step-570));
+    if (!cache.has(key)) {
+      const x=ix*step-570,z=iz*step-570;
+      cache.set(key,sculptAlpineFall(x,z,getTerrainHeight(x,z)));
+    }
     return cache.get(key);
   }
   return (x,z) => {
