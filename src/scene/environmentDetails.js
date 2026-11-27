@@ -291,6 +291,7 @@ export class EnvironmentDetails {
     this.buildEvergreenUndergrowth(perf.shrubCount || 360);
     this.buildDistantTaigaCarpet(perf.distantForestCount || 1500);
     this.buildPanoramicTreelineBackdrop();
+    this.buildAlpineMountainGroves(perf.isMobile ? 48 : 64);
     this.buildValleyMist();
     this.buildSnowfall(perf.snowCount);
     this.buildDistantBirds();
@@ -909,6 +910,130 @@ export class EnvironmentDetails {
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       this.group.add(mesh);
+    }
+  }
+
+  // Layer 4: Scattered Organic Alpine Spruce Groves climbing the distant snowy mountain flanks & saddles!
+  // Clusters of 7-15 wind-sculpted hardy conifers tucked into natural gullies (1 Draw Call, ~2,400 tris total!)
+  buildAlpineMountainGroves(groveCount = 60) {
+    const geo = createDistantSpruceCardGeometry();
+    const tex = createFullSpruceCardTexture(256);
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      alphaTest: 0.36,
+      side: THREE.DoubleSide,
+      roughness: 0.9,
+      metalness: 0.0
+    });
+
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uSnowCover = this.snowCoverUniform;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+         varying float vAlpineV;`
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <uv_vertex>',
+        `#include <uv_vertex>
+         vAlpineV = uv.y;`
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+         uniform float uSnowCover;
+         varying float vAlpineV;`
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+         // Higher mountain conifers carry heavier alpine snow dusting on upper boughs
+         float alpineSnow = smoothstep(0.24, 0.94, vAlpineV) * (0.24 + uSnowCover * 0.38);
+         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.91, 0.97), alpineSnow);`
+      );
+    };
+
+    const matrices = [];
+    const tints = [];
+    const dummy = new THREE.Object3D();
+    const colA = new THREE.Color('#9fb9ad');
+    const colB = new THREE.Color('#c8ddd3');
+    const colC = new THREE.Color('#7f9b90');
+    const tmpCol = new THREE.Color();
+
+    let placedGroves = 0;
+    let attempts = 0;
+    while (placedGroves < groveCount && attempts < groveCount * 22) {
+      attempts++;
+      // Bias slightly toward the iconic northern mountain range (z < -150) while also dotting east/west mountain flanks
+      const isNorthHero = this.rand() < 0.68;
+      let gx, gz;
+      if (isNorthHero) {
+        const spreadAngle = (this.rand() - 0.5) * 2.15;
+        const dist = 195 + this.rand() * 215;
+        gx = Math.sin(spreadAngle) * dist;
+        gz = -Math.cos(spreadAngle) * dist - 20;
+      } else {
+        const a = this.rand() * Math.PI * 2;
+        const dist = 190 + this.rand() * 190;
+        gx = Math.cos(a) * dist;
+        gz = Math.sin(a) * dist - 40;
+      }
+
+      const gy = getTerrainHeight(gx, gz);
+      // Mid-to-upper mountain timberline flanks & sheltered valleys (above main foothill forest!)
+      if (gy < 17.5 || gy > 64.0) continue;
+
+      const sDx = getTerrainHeight(gx + 5.0, gz) - gy;
+      const sDz = getTerrainHeight(gx, gz + 5.0) - gy;
+      if (Math.hypot(sDx, sDz) > 3.6) continue;
+
+      placedGroves++;
+      // Each mountain grove has 7-15 organically clustered trees tapering smaller at higher elevations
+      const altNorm = Math.max(0, Math.min(1, (gy - 18.0) / 46.0));
+      const treesInGrove = Math.max(5, Math.round((7 + this.rand() * 9) * (1.0 - altNorm * 0.42)));
+      const clusterRx = 8.5 + this.rand() * 14.0;
+      const clusterRz = 7.0 + this.rand() * 11.5;
+
+      for (let t = 0; t < treesInGrove; t++) {
+        const ta = this.rand() * Math.PI * 2;
+        const tr = Math.pow(this.rand(), 0.72);
+        const x = gx + Math.cos(ta) * tr * clusterRx;
+        const z = gz + Math.sin(ta) * tr * clusterRz;
+        const y = getTerrainHeight(x, z);
+        if (y < WATER_LEVEL + 2.0 || y > 68.0) continue;
+
+        const yDx = getTerrainHeight(x + 3.0, z);
+        const yDz = getTerrainHeight(x, z + 3.0);
+        if (Math.hypot(yDx - y, yDz - y) > 2.9) continue;
+
+        const localAlt = Math.max(0, Math.min(1, (y - 18.0) / 50.0));
+        // Hardy shorter alpine conifers near upper ridges, taller pines in lower mountain saddles
+        const sc = (0.58 + this.rand() * 0.72) * (1.18 - localAlt * 0.56);
+        dummy.position.set(x, Math.min(y, yDx, yDz) - 0.65, z);
+        dummy.rotation.set(0, this.rand() * Math.PI * 2, 0);
+        dummy.scale.set(sc * (0.85 + this.rand() * 0.3), sc, sc * (0.85 + this.rand() * 0.3));
+        dummy.updateMatrix();
+        matrices.push(dummy.matrix.clone());
+
+        const rRoll = this.rand();
+        tmpCol.copy(rRoll < 0.38 ? colA : rRoll < 0.72 ? colB : colC);
+        tints.push(tmpCol.r, tmpCol.g, tmpCol.b);
+      }
+    }
+
+    if (matrices.length > 0) {
+      const inst = new THREE.InstancedMesh(geo, mat, matrices.length);
+      const c = new THREE.Color();
+      for (let i = 0; i < matrices.length; i++) {
+        inst.setMatrixAt(i, matrices[i]);
+        c.setRGB(tints[i * 3], tints[i * 3 + 1], tints[i * 3 + 2]);
+        inst.setColorAt(i, c);
+      }
+      inst.instanceMatrix.needsUpdate = true;
+      if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+      this.group.add(inst);
     }
   }
 

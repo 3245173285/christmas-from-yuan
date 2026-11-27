@@ -20,6 +20,8 @@ import { NordicAudioEngine } from './audio/audioEngine.js';
 import { ControlsUI } from './ui/controlsUI.js';
 import { FrostIntro } from './ui/frostIntro.js';
 import { GiftCardModal } from './ui/giftCardModal.js';
+import { WishCardStudio } from './ui/wishCardStudio.js';
+import { fetchWishCards } from './services/wishCardsService.js';
 
 function initNordicChristmas() {
   const container = document.getElementById('canvas-container');
@@ -91,6 +93,26 @@ function initNordicChristmas() {
   const cameraRig = new CinematicCameraRig(camera, renderer.domElement);
   const audioEngine = new NordicAudioEngine();
   const giftCardModal = new GiftCardModal();
+  const wishCardStudio = new WishCardStudio({
+    onCardSubmitted: (card) => {
+      const worldPos = christmasTree.hangNewWishCard(card);
+      magicParticles.emitGiftBurst(worldPos);
+      audioEngine.playGiftOpen();
+    }
+  });
+
+  const btnOpenStudio = document.getElementById('btn-open-card-studio');
+  if (btnOpenStudio) {
+    btnOpenStudio.addEventListener('click', () => {
+      wishCardStudio.openCreate();
+    });
+  }
+
+  // Load real-time wish cards (Cloudflare KV or local starter wall) & hang them directly on Yuan's 3D Christmas Tree!
+  fetchWishCards().then((cards) => {
+    christmasTree.syncWishCards(cards);
+    wishCardStudio.setCards(cards);
+  });
 
   new InteractionManager({
     camera,
@@ -100,7 +122,8 @@ function initNordicChristmas() {
     magicParticles,
     cameraRig,
     audioEngine,
-    giftCardModal
+    giftCardModal,
+    wishCardStudio
   });
 
   const ui = new ControlsUI({

@@ -16,7 +16,8 @@ export class InteractionManager {
     magicParticles,
     cameraRig,
     audioEngine,
-    giftCardModal
+    giftCardModal,
+    wishCardStudio
   }) {
     this.camera = camera;
     this.domElement = domElement;
@@ -26,6 +27,7 @@ export class InteractionManager {
     this.cameraRig = cameraRig;
     this.audio = audioEngine;
     this.giftModal = giftCardModal;
+    this.wishStudio = wishCardStudio;
 
     this.raycaster = new THREE.Raycaster();
     this.ndc = new THREE.Vector2();
@@ -33,6 +35,10 @@ export class InteractionManager {
     this.pendingCardTimer = null;
 
     this.bindEvents();
+  }
+
+  isModalBlocking() {
+    return Boolean(this.giftModal?.isOpen || this.wishStudio?.isOpen);
   }
 
   isIntroBlocking() {
@@ -48,18 +54,18 @@ export class InteractionManager {
 
   bindEvents() {
     this.domElement.addEventListener('pointerdown', (e) => {
-      if (this.isIntroBlocking() || this.giftModal.isOpen) return;
+      if (this.isIntroBlocking() || this.isModalBlocking()) return;
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       this.pointerDownPos = { x: e.clientX, y: e.clientY, time: performance.now() };
     });
 
     this.domElement.addEventListener('pointermove', (e) => {
-      if (this.isIntroBlocking() || this.giftModal.isOpen) return;
+      if (this.isIntroBlocking() || this.isModalBlocking()) return;
       this.handleHoverAndAuroraBrush(e);
     }, { passive: true });
 
     this.domElement.addEventListener('pointerup', (e) => {
-      if (!this.pointerDownPos || this.isIntroBlocking() || this.giftModal.isOpen) {
+      if (!this.pointerDownPos || this.isIntroBlocking() || this.isModalBlocking()) {
         this.pointerDownPos = null;
         return;
       }
@@ -77,6 +83,18 @@ export class InteractionManager {
   handleHoverAndAuroraBrush(e) {
     this.updateNDC(e.clientX, e.clientY);
     this.raycaster.setFromCamera(this.ndc, this.camera);
+
+    // 0. Check Hover over 3D Hanging Wish Cards on the Christmas Tree
+    const cardHits = this.raycaster.intersectObjects(this.tree.getHangingCardHitMeshes(), false);
+    if (cardHits.length > 0) {
+      const cardId = cardHits[0].object.userData.hangingCardId;
+      this.tree.setHoveredHangingCard(cardId);
+      this.tree.setHoveredGift(-1);
+      this.tree.setStarHovered(false);
+      this.domElement.style.cursor = 'pointer';
+      return;
+    }
+    this.tree.setHoveredHangingCard(null);
 
     // 1. Check Hover over 10 Special Gift Boxes
     const giftHits = this.raycaster.intersectObjects(this.tree.getSpecialGiftHitMeshes(), false);
@@ -111,6 +129,19 @@ export class InteractionManager {
   handleClick(clientX, clientY) {
     this.updateNDC(clientX, clientY);
     this.raycaster.setFromCamera(this.ndc, this.camera);
+
+    // Priority 0: 3D Hanging Wish Cards on the Christmas Tree -> Sparkle Chime + Interactive 3D Reflective Card Viewer!
+    const cardHits = this.raycaster.intersectObjects(this.tree.getHangingCardHitMeshes(), false);
+    if (cardHits.length > 0 && this.wishStudio) {
+      const cardId = cardHits[0].object.userData.hangingCardId;
+      const card = this.tree.getHangingCardById(cardId);
+      if (card) {
+        this.audio.playGiftOpen();
+        this.particles.emitOrnamentChime(cardHits[0].point);
+        this.wishStudio.openViewer(card);
+        return;
+      }
+    }
 
     // Priority 1: 10 Special Mystery Gift Boxes -> Zoom In + Lid Pop + Fairy Dust + Vintage Greeting Card!
     const giftHits = this.raycaster.intersectObjects(this.tree.getSpecialGiftHitMeshes(), false);

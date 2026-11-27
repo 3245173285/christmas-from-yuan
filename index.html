@@ -86,8 +86,16 @@
 
           <div class="tool-divider"></div>
 
-          <!-- Environment & Snow Intensity Controls -->
+          <!-- Environment, Wish Card Studio & Snow Controls -->
           <div class="tool-group action-group">
+            <button id="btn-open-card-studio" class="pill-btn wish-cta-btn" type="button" title="自定义圣诞贺卡并挂到 Yuan 的圣诞树上">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+                <polyline points="3.5 6 12 13 20.5 6" />
+              </svg>
+              <span>送贺卡</span>
+            </button>
+
             <div class="snow-control-capsule" title="降雪开关与降雪强度调节（小雪 → 大雪）">
               <button id="btn-snow" class="icon-btn is-active" title="降雪开关" aria-label="降雪开关">
                 <svg viewBox="0 0 24 24">
@@ -187,6 +195,108 @@
           </div>
         </div>
       </article>
+    </div>
+
+    <!-- 5-Style 3D Reflective Christmas Card Studio & Tree Card Viewer -->
+    <div id="wish-studio-modal" class="wish-studio-modal" aria-hidden="true">
+      <section id="wish-studio-shell" class="wish-studio-shell" aria-label="给 Yuan 送圣诞贺卡">
+        <header class="ws-header">
+          <div class="ws-tabs" role="tablist">
+            <button id="tab-studio-create" class="ws-tab is-active" type="button">✉️ 写贺卡给 Yuan</button>
+            <button id="tab-studio-gallery" class="ws-tab" type="button">
+              🎄 树上的贺卡 <span id="studio-gallery-count" class="ws-count">0</span>
+            </button>
+          </div>
+          <button id="btn-close-studio" class="ws-close-icon" type="button" aria-label="关闭贺卡工坊">✕</button>
+        </header>
+
+        <!-- Pane 1: Card Creator & 3D Reflective Preview -->
+        <div id="studio-pane-create" class="ws-pane ws-pane-create">
+          <div class="ws-preview-col">
+            <div class="ws-stage-head">
+              <span id="studio-style-meta" class="ws-style-meta">复古烫金 · 羊皮纸 · 金属烫金反光</span>
+              <button id="btn-toggle-3d-preview" class="ws-preview-toggle" type="button">✨ 3D 倾斜预览</button>
+            </div>
+
+            <div id="studio-card-stage" class="ws-card-stage">
+              <div id="studio-reflective-card" class="reflective-card" data-style="parchment"></div>
+            </div>
+
+            <p class="ws-tilt-hint">👆 滑动卡面感受 3D 倾斜与材质反光 · 点击贴纸可自由拖拽缩放</p>
+
+            <!-- Contextual Sticker Transform Bar (appears when a sticker on the card is selected) -->
+            <div id="studio-sticker-toolbar" class="ws-sticker-toolbar" aria-label="贴纸调节">
+              <button type="button" data-st-action="scale-down" title="缩小">－</button>
+              <button type="button" data-st-action="scale-up" title="放大">＋</button>
+              <button type="button" data-st-action="rot-left" title="向左旋转">↺</button>
+              <button type="button" data-st-action="rot-right" title="向右旋转">↻</button>
+              <button type="button" class="is-danger" data-st-action="delete" title="删除贴纸">删除</button>
+            </div>
+          </div>
+
+          <div class="ws-editor-col">
+            <div class="ws-field">
+              <div class="ws-field-label">1. 选择贺卡材质款式（5 款专属反光）</div>
+              <div id="studio-style-picker" class="ws-style-picker"></div>
+            </div>
+
+            <div class="ws-field">
+              <div class="ws-field-label">2. 点击添加贴纸（可在卡面上自由拖动）</div>
+              <div id="studio-sticker-tray" class="ws-sticker-tray"></div>
+            </div>
+
+            <div class="ws-field">
+              <div class="ws-field-label-row">
+                <label for="studio-input-message" class="ws-field-label">3. 写给 Yuan 的圣诞祝福</label>
+                <span id="studio-char-count" class="ws-char-count">0 / 280</span>
+              </div>
+              <textarea
+                id="studio-input-message"
+                class="ws-textarea"
+                rows="3"
+                maxlength="280"
+                placeholder="写下你的冬日心意、愿望或悄悄话…"
+              ></textarea>
+            </div>
+
+            <div class="ws-field">
+              <label for="studio-input-signature" class="ws-field-label">4. 你的署名（单独展示在落款处）</label>
+              <input
+                id="studio-input-signature"
+                class="ws-input"
+                type="text"
+                maxlength="28"
+                placeholder="例如：阿星 / 小林 / 你的昵称"
+              />
+            </div>
+
+            <div id="studio-status-msg" class="ws-status-msg" role="status"></div>
+
+            <button id="btn-submit-wish-card" class="ws-submit-btn" type="button">
+              🎄 送给 Yuan 并挂上圣诞树
+            </button>
+          </div>
+        </div>
+
+        <!-- Pane 2: All Cards Hung on Yuan's Tree -->
+        <div id="studio-pane-gallery" class="ws-pane ws-pane-gallery" hidden>
+          <p class="ws-gallery-tip">每一张贺卡都真实挂在 3D 圣诞树枝桠上，点击任意卡片即可 3D 倾斜赏光 ✨</p>
+          <div id="studio-gallery-grid" class="ws-gallery-grid"></div>
+        </div>
+
+        <!-- Pane 3: Immersive 3D Tilt-Reflective Card Viewer (opened from 3D Tree click or Gallery click!) -->
+        <div id="studio-pane-viewer" class="ws-pane ws-pane-viewer" hidden>
+          <div id="viewer-card-meta" class="ws-style-meta"></div>
+          <div id="viewer-card-stage" class="ws-card-stage is-viewer-stage">
+            <div id="viewer-reflective-card" class="reflective-card" data-style="parchment"></div>
+          </div>
+          <p class="ws-tilt-hint">👆 滑动屏幕或移动鼠标，欣赏 3D 倾斜与材质专属反光</p>
+          <div class="ws-viewer-actions">
+            <button id="btn-viewer-back" class="ws-secondary-btn" type="button">🎄 查看全部树上贺卡</button>
+            <button id="btn-viewer-write" class="ws-submit-btn is-compact" type="button">✉️ 我也要送一张</button>
+          </div>
+        </div>
+      </section>
     </div>
 
     <script type="module" src="/src/main.js"></script>

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GIFT_CARDS } from '../data/giftCards.js';
+import { CARD_STYLE_MAP } from '../data/wishCardsConfig.js';
 import { createGiftInterior } from './giftMiniatures.js';
 import { getTerrainHeight, mulberry32 } from '../utils/noise.js';
 import {
@@ -160,6 +161,10 @@ export class LuxuryChristmasTree {
     this.starHovered = false;
     this.specialGifts = [];
     this.hoveredGiftIdx = -1;
+    this.hangingCards = [];
+    this.hoveredHangingCardId = null;
+    this.hangingCardsGroup = new THREE.Group();
+    this.group.add(this.hangingCardsGroup);
     this.glowTex = createSoftGlowTexture(128, 'rgba(255,246,214,0.95)', 'rgba(255,204,108,0.42)');
 
     this.perf = perf;
@@ -171,6 +176,279 @@ export class LuxuryChristmasTree {
     this.buildStarTopper();
     this.buildGiftBoxes();
     this.buildTreeLighting();
+    this.initHangingCardResources();
+  }
+
+  initHangingCardResources() {
+    this.hangingCardGeo = new THREE.BoxGeometry(0.42, 0.56, 0.024);
+    this.hangingCordGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.22, 5);
+    this.hangingRingGeo = new THREE.TorusGeometry(0.032, 0.008, 6, 12);
+    this.hangingHitGeo = new THREE.BoxGeometry(0.72, 0.88, 0.36);
+    this.hangingGoldMat = new THREE.MeshStandardMaterial({
+      color: '#f2ce76',
+      emissive: new THREE.Color('#805914'),
+      emissiveIntensity: 0.35,
+      metalness: 0.9,
+      roughness: 0.2
+    });
+    this.hangingHitMat = new THREE.MeshBasicMaterial({ visible: false });
+  }
+
+  createMiniWishCardTexture(card) {
+    const st = CARD_STYLE_MAP[card.style] || CARD_STYLE_MAP.parchment;
+    const w = 192;
+    const h = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    // Rich style-matched card face background
+    const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+    if (card.style === 'aurora') {
+      bgGrad.addColorStop(0, '#07142e');
+      bgGrad.addColorStop(0.55, '#103c56');
+      bgGrad.addColorStop(1, '#1d695e');
+    } else if (card.style === 'crimson') {
+      bgGrad.addColorStop(0, '#5a0b18');
+      bgGrad.addColorStop(0.55, '#841325');
+      bgGrad.addColorStop(1, '#4c0914');
+    } else if (card.style === 'ice') {
+      bgGrad.addColorStop(0, '#e8f5ff');
+      bgGrad.addColorStop(0.55, '#b6dbf7');
+      bgGrad.addColorStop(1, '#79aed9');
+    } else if (card.style === 'emerald') {
+      bgGrad.addColorStop(0, '#0b261c');
+      bgGrad.addColorStop(0.55, '#154634');
+      bgGrad.addColorStop(1, '#092017');
+    } else {
+      bgGrad.addColorStop(0, '#fbf4e2');
+      bgGrad.addColorStop(0.55, '#efe0be');
+      bgGrad.addColorStop(1, '#dfc494');
+    }
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Ornate double foil border
+    ctx.strokeStyle = st.miniBorder;
+    ctx.lineWidth = 5;
+    ctx.strokeRect(10, 10, w - 20, h - 20);
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = 0.72;
+    ctx.strokeRect(18, 18, w - 36, h - 36);
+    ctx.globalAlpha = 1.0;
+
+    // Top 4-point star ornament
+    ctx.fillStyle = st.miniBorder;
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 32);
+    ctx.lineTo(w / 2 + 6, 46);
+    ctx.lineTo(w / 2 + 16, 50);
+    ctx.lineTo(w / 2 + 6, 54);
+    ctx.lineTo(w / 2, 68);
+    ctx.lineTo(w / 2 - 6, 54);
+    ctx.lineTo(w / 2 - 16, 50);
+    ctx.lineTo(w / 2 - 6, 46);
+    ctx.closePath();
+    ctx.fill();
+
+    // "TO YUAN" header
+    ctx.fillStyle = st.miniText;
+    ctx.font = '600 18px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('TO YUAN', w / 2, 95);
+
+    // Stylized festive handwriting shimmer lines
+    ctx.strokeStyle = st.miniText;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 2.2;
+    const lineWidths = [96, 114, 84, 102];
+    for (let i = 0; i < lineWidths.length; i++) {
+      const ly = 118 + i * 16;
+      const lw = lineWidths[i];
+      ctx.beginPath();
+      ctx.moveTo((w - lw) / 2, ly);
+      ctx.lineTo((w + lw) / 2, ly);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Wax seal / gemstone emblem
+    ctx.fillStyle = st.miniAccent;
+    ctx.beginPath();
+    ctx.arc(w / 2, 196, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = st.miniBorder;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Friend's signature at bottom
+    ctx.fillStyle = st.miniText;
+    ctx.font = 'italic 600 17px Georgia, "Songti SC", sans-serif';
+    const sigText = (card.signature || 'Friend').slice(0, 10);
+    ctx.fillText(sigText, w / 2, 232);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // Deterministic non-overlapping golden-angle bough placement around the hero tree
+  // First few slots favor the front-facing hemisphere so visitors spot hanging wish cards right away!
+  computeHangingCardSlot(index) {
+    const frontSlots = [
+      { hNorm: 0.34, angle: 0.28 },
+      { hNorm: 0.48, angle: -0.42 },
+      { hNorm: 0.26, angle: -0.96 },
+      { hNorm: 0.58, angle: 0.78 },
+      { hNorm: 0.40, angle: 1.24 },
+      { hNorm: 0.66, angle: -0.14 }
+    ];
+    let hNorm, angle;
+    if (index < frontSlots.length) {
+      hNorm = frontSlots[index].hNorm;
+      angle = frontSlots[index].angle;
+    } else {
+      const k = index - frontSlots.length;
+      const golden = 2.399963229728653;
+      hNorm = 0.18 + ((k * 0.6180339887) % 1) * 0.62;
+      angle = 1.7 + k * golden;
+    }
+
+    const y = this.skirtStartY + hNorm * (this.treeHeight - this.skirtStartY - 0.85);
+    const r = getTreeRadiusAtHeight(hNorm) + 0.34;
+    return {
+      x: Math.sin(angle) * r,
+      y,
+      z: Math.cos(angle) * r,
+      angle
+    };
+  }
+
+  buildSingleHangingCardNode(card, slotIndex, animateSpawn = false) {
+    const slot = this.computeHangingCardSlot(slotIndex);
+    const st = CARD_STYLE_MAP[card.style] || CARD_STYLE_MAP.parchment;
+
+    const anchor = new THREE.Group();
+    anchor.position.set(slot.x, slot.y, slot.z);
+    anchor.rotation.y = slot.angle;
+
+    // Pivot at top hanging ring so card sways like a real festive pendant in the winter breeze
+    const pivot = new THREE.Group();
+    anchor.add(pivot);
+
+    const cord = new THREE.Mesh(this.hangingCordGeo, this.hangingGoldMat);
+    cord.position.y = -0.11;
+    pivot.add(cord);
+
+    const ring = new THREE.Mesh(this.hangingRingGeo, this.hangingGoldMat);
+    ring.position.y = -0.22;
+    pivot.add(ring);
+
+    const tex = this.createMiniWishCardTexture(card);
+    const faceMat = new THREE.MeshStandardMaterial({
+      map: tex,
+      emissiveMap: tex,
+      emissive: new THREE.Color('#ffffff'),
+      emissiveIntensity: 0.48,
+      roughness: 0.34,
+      metalness: 0.22
+    });
+    const edgeMat = this.hangingGoldMat;
+
+    const cardMesh = new THREE.Mesh(this.hangingCardGeo, [
+      edgeMat, edgeMat, edgeMat, edgeMat, faceMat, faceMat
+    ]);
+    cardMesh.position.y = -0.51;
+    pivot.add(cardMesh);
+
+    // Soft twinkling beacon halo so every friend's card stands out gently like a jewel among the branches
+    const haloMat = new THREE.SpriteMaterial({
+      map: this.glowTex,
+      color: st.haloHex,
+      transparent: true,
+      opacity: 0.52,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const halo = new THREE.Sprite(haloMat);
+    halo.position.set(0, -0.51, 0.05);
+    halo.scale.set(1.12, 1.28, 1);
+    pivot.add(halo);
+
+    // Generous invisible hit box for effortless mobile & desktop tapping
+    const hitMesh = new THREE.Mesh(this.hangingHitGeo, this.hangingHitMat);
+    hitMesh.position.y = -0.51;
+    hitMesh.userData.hangingCardId = card.id;
+    pivot.add(hitMesh);
+
+    if (animateSpawn) {
+      pivot.scale.setScalar(0.01);
+    }
+
+    this.hangingCardsGroup.add(anchor);
+
+    return {
+      id: card.id,
+      card,
+      anchor,
+      pivot,
+      faceMat,
+      tex,
+      halo,
+      haloMat,
+      hitMesh,
+      phase: slotIndex * 1.37 + 0.4,
+      spawnProgress: animateSpawn ? 0 : 1,
+      hoverScale: 1
+    };
+  }
+
+  syncWishCards(cards = []) {
+    // Dispose previous hanging card textures/materials cleanly
+    for (const hc of this.hangingCards) {
+      this.hangingCardsGroup.remove(hc.anchor);
+      hc.faceMat.dispose();
+      hc.tex.dispose();
+      hc.haloMat.dispose();
+    }
+    this.hangingCards = [];
+
+    const maxVisibleOnTree = Math.min(cards.length, 48);
+    for (let i = 0; i < maxVisibleOnTree; i++) {
+      this.hangingCards.push(this.buildSingleHangingCardNode(cards[i], i, false));
+    }
+  }
+
+  // Hang a freshly submitted friend's card immediately onto the front of the Christmas tree with spring pop-in!
+  hangNewWishCard(card) {
+    const existingIdx = this.hangingCards.findIndex((h) => h.id === card.id);
+    if (existingIdx !== -1) {
+      this.group.updateMatrixWorld(true);
+      return new THREE.Vector3(0, -0.5, 0).applyMatrix4(this.hangingCards[existingIdx].anchor.matrixWorld);
+    }
+
+    // Place freshly submitted card in a prominent next slot so the sender sees it appear immediately!
+    const slotIdx = this.hangingCards.length;
+    const node = this.buildSingleHangingCardNode(card, slotIdx, true);
+    this.hangingCards.unshift(node);
+
+    this.group.updateMatrixWorld(true);
+    return new THREE.Vector3(0, -0.5, 0).applyMatrix4(node.anchor.matrixWorld);
+  }
+
+  getHangingCardHitMeshes() {
+    return this.hangingCards.map((h) => h.hitMesh);
+  }
+
+  getHangingCardById(cardId) {
+    const found = this.hangingCards.find((h) => h.id === cardId);
+    return found ? found.card : null;
+  }
+
+  setHoveredHangingCard(cardId) {
+    this.hoveredHangingCardId = cardId;
   }
 
   buildTrunkAndBoughs() {
@@ -1355,6 +1633,36 @@ export class LuxuryChristmasTree {
       }
       const goalLight = activeOpenGift ? 5.2 : 0.0;
       this.activeGiftLight.intensity += (goalLight - this.activeGiftLight.intensity) * Math.min(1, dt * 6.5);
+    }
+
+    // 4. Gently sway & shimmer the 3D Hanging Wish Cards on the Christmas tree branches!
+    for (let i = 0; i < this.hangingCards.length; i++) {
+      const hc = this.hangingCards[i];
+      const isHovered = this.hoveredHangingCardId === hc.id;
+
+      // Elastic spring pop-in when a new card is freshly hung
+      if (hc.spawnProgress < 1) {
+        hc.spawnProgress = Math.min(1, hc.spawnProgress + dt * 1.65);
+        const t = hc.spawnProgress;
+        const spring = t < 1 ? 1 - Math.pow(2, -9 * t) * Math.cos(t * Math.PI * 3.5) : 1;
+        hc.pivot.scale.setScalar(Math.max(0.01, spring));
+      } else {
+        const goalSc = isHovered ? 1.24 : 1.0;
+        hc.hoverScale += (goalSc - hc.hoverScale) * Math.min(1, dt * 10);
+        hc.pivot.scale.setScalar(hc.hoverScale);
+      }
+
+      // Soft breeze pendulum sway
+      hc.pivot.rotation.z = Math.sin(elapsedTime * 1.35 + hc.phase) * 0.095;
+      hc.pivot.rotation.x = Math.cos(elapsedTime * 1.05 + hc.phase * 1.4) * 0.055;
+
+      // Warm luminous readability & gentle beacon pulse at night
+      const pulse = 0.5 + 0.5 * Math.sin(elapsedTime * 2.5 + hc.phase);
+      const spawnFlash = hc.spawnProgress < 1 ? (1 - hc.spawnProgress) * 0.85 : 0;
+      hc.faceMat.emissiveIntensity = 0.22 + lf * 0.42 + (isHovered ? 0.35 : 0) + spawnFlash;
+      hc.haloMat.opacity = Math.min(1.0, (0.2 + lf * 0.36 + pulse * 0.18 + (isHovered ? 0.36 : 0) + spawnFlash));
+      const hs = (1.02 + pulse * 0.14 + (isHovered ? 0.32 : 0) + spawnFlash * 0.7);
+      hc.halo.scale.set(hs * 1.05, hs * 1.22, 1);
     }
   }
 }

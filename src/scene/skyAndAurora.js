@@ -28,6 +28,7 @@ const SKY_FRAGMENT_SHADER = /* glsl */ `
   uniform float uSunElevation;
   uniform float uStarIntensity;
   uniform float uAuroraIntensity;
+  uniform float uMobileBoost;
   uniform vec3 uCloudTint;
   uniform float uCloudOpacity;
 
@@ -124,7 +125,7 @@ const SKY_FRAGMENT_SHADER = /* glsl */ `
       }
     }
 
-    // 5. Soft Distant Sky Aurora Ambient Glow (pre-baked 2-tap LUT!)
+    // 5. Soft Distant Sky Aurora Ambient Glow (pre-baked 2-tap LUT + mobile brightness boost!)
     if (uAuroraIntensity > 0.01 && h > 0.02) {
       float northMask = smoothstep(-0.35, 0.65, -dir.z) * smoothstep(0.05, 0.32, h) * (1.0 - smoothstep(0.55, 0.92, h));
       if (northMask > 0.01) {
@@ -132,23 +133,49 @@ const SKY_FRAGMENT_SHADER = /* glsl */ `
         float drift = uTime * 0.035;
         float n1 = fastFbm(aUV * 1.1 + vec2(drift, -drift * 0.4));
         float n2 = fastFbmDetail(aUV * 1.8 - vec2(drift * 0.6, drift * 0.8) + n1 * 1.2);
-        float ribbon = smoothstep(0.45, 0.78, n2) * northMask;
-        vec3 aCol = mix(vec3(0.08, 0.62, 0.44), vec3(0.28, 0.22, 0.64), smoothstep(0.22, 0.62, h));
-        sky += aCol * ribbon * 0.32 * uAuroraIntensity;
+        float ribbon = smoothstep(0.42, 0.78, n2) * northMask;
+        vec3 aCol = mix(vec3(0.08, 0.68, 0.48), vec3(0.32, 0.24, 0.72), smoothstep(0.22, 0.62, h));
+        sky += aCol * ribbon * 0.36 * uAuroraIntensity * uMobileBoost;
       }
     }
 
-    // 6. Slowly Drifting High-Altitude Clouds (pre-baked 2-tap LUT!)
-    if (h > 0.03 && uCloudOpacity > 0.01) {
-      vec2 cUV = dir.xz / (h + 0.16) * 0.55;
-      cUV.x += uTime * 0.0085;
-      cUV.y += uTime * 0.0028;
-      float cBase = fastFbm(cUV);
-      float cDetail = fastFbmDetail(cUV * 1.9 + vec2(uTime * 0.004, 3.1));
-      float cloud = smoothstep(0.45, 0.76, cBase * 0.72 + cDetail * 0.28);
-      float horizonFade = smoothstep(0.03, 0.2, h) * (1.0 - smoothstep(0.75, 0.98, h));
-      vec3 cColor = uCloudTint + uSunColor * pow(sunDot, 6.0) * 0.28 * smoothstep(-0.1, 0.3, uSunElevation);
-      sky = mix(sky, cColor, cloud * horizonFade * uCloudOpacity);
+    // 6. Rich Two-Layer Volumetric Nordic Cloudscape (Lower Sculpted Cumulus Banks + High Wispy Cirrus, 100% LUT-powered!)
+    if (h > 0.025 && uCloudOpacity > 0.01) {
+      // Layer A: Fuller billowing lower stratocumulus banks with sunlit silver/gold rims & soft belly shading
+      vec2 cUV1 = dir.xz / (h + 0.22) * 0.42;
+      cUV1.x += uTime * 0.0072;
+      cUV1.y += uTime * 0.0024;
+      float cShape = fastFbm(cUV1);
+      float cPuff = fastFbmDetail(cUV1 * 2.15 + vec2(uTime * 0.0045, 2.7));
+      float cRaw = cShape * 0.68 + cPuff * 0.32;
+      float lowCloud = smoothstep(0.37, 0.72, cRaw);
+
+      // Sun-side directional thickness sample for realistic 3D silver-lining & cloud depth
+      vec2 sunStep = normalize(uSunDir.xz + vec2(0.0001)) * 0.085;
+      float cLitSample = fastFbm(cUV1 + sunStep);
+      float selfShadow = smoothstep(0.32, 0.74, cShape - cLitSample + 0.52);
+
+      // Layer B: High-altitude silky cirrus streaks sweeping across upper vault
+      vec2 cUV2 = (dir.xz / (h + 0.14)) * vec2(0.26, 0.78);
+      cUV2.x -= uTime * 0.0048;
+      cUV2.y += uTime * 0.0031;
+      float highCirrus = smoothstep(0.46, 0.78, fastFbmDetail(cUV2 * 1.45 + cShape * 0.35)) * 0.52;
+
+      float horizonFade = smoothstep(0.025, 0.16, h) * (1.0 - smoothstep(0.78, 0.99, h));
+      float daySunMask = smoothstep(-0.14, 0.28, uSunElevation);
+      float silverLining = pow(sunDot, 7.0) * 0.42 * daySunMask + pow(sunDot, 2.2) * 0.16 * daySunMask;
+
+      // Subtle dark belly -> warm/bright top + gentle aurora teal reflection on cloud undersides at night
+      vec3 cloudDark = mix(uHorizonColor * 0.65, uCloudTint * 0.62, 0.65);
+      vec3 lowCol = mix(cloudDark, uCloudTint, 0.38 + selfShadow * 0.62);
+      lowCol += uSunColor * silverLining * (1.0 - lowCloud * 0.42);
+      lowCol += vec3(0.08, 0.36, 0.32) * uAuroraIntensity * 0.34 * uMobileBoost * (1.0 - selfShadow * 0.5);
+
+      vec3 highCol = mix(uCloudTint, vec3(0.95, 0.97, 1.0), 0.28 * daySunMask) + uSunColor * pow(sunDot, 5.0) * 0.22 * daySunMask;
+
+      // Composite high cirrus behind, fuller low cumulus in front
+      sky = mix(sky, highCol, clamp(highCirrus * horizonFade * uCloudOpacity * 0.85, 0.0, 0.78));
+      sky = mix(sky, lowCol, clamp(lowCloud * horizonFade * uCloudOpacity * 1.08, 0.0, 0.92));
     }
 
     // Blend gently below horizon toward fog/horizon color
@@ -200,6 +227,7 @@ const AURORA_FRAGMENT_SHADER = /* glsl */ `
   uniform float uTime;
   uniform sampler2D uNoiseTex;
   uniform float uIntensity;
+  uniform float uMobileBoost;
   uniform float uPhase;
   uniform vec3 uColorLow;
   uniform vec3 uColorMid;
@@ -255,10 +283,13 @@ const AURORA_FRAGMENT_SHADER = /* glsl */ `
       col += vec3(0.45, 0.32, 0.85) * ring * uRippleAmp * 0.35;
     }
 
-    float alpha = (verticalProfile * (0.22 + 0.68 * rays) + fringe * 0.18 + rippleGlow * 0.38 * verticalProfile) * edgeFade * pulse * uIntensity * 0.44;
+    // Mobile aurora brightness & vibrancy compensation (makes 2 non-bloom mobile curtains glow as vividly as 3 bloomed desktop curtains!)
+    float mobAlphaMult = mix(1.0, 1.56, clamp(uMobileBoost - 1.0, 0.0, 1.0));
+    float mobColMult = mix(1.0, 1.28, clamp(uMobileBoost - 1.0, 0.0, 1.0));
+    float alpha = (verticalProfile * (0.24 + 0.7 * rays) + fringe * 0.22 + rippleGlow * 0.38 * verticalProfile) * edgeFade * pulse * uIntensity * 0.44 * mobAlphaMult;
 
     if (alpha < 0.004) discard;
-    gl_FragColor = vec4(col * (0.72 + rays * 0.34 + rippleGlow * 0.65), alpha);
+    gl_FragColor = vec4(col * (0.76 + rays * 0.36 + rippleGlow * 0.65) * mobColMult, min(0.92, alpha));
   }
 `;
 
@@ -295,6 +326,7 @@ export class SkyAndAurora {
     scene.add(this.group);
 
     const noiseTex = getSharedNoiseLUTTexture(256);
+    const mobileBoost = perf.isMobile ? 1.68 : 1.0;
 
     // 1. Sky Dome
     const skyGeo = new THREE.SphereGeometry(920, perf.isMobile ? 28 : 42, perf.isMobile ? 18 : 28);
@@ -314,8 +346,9 @@ export class SkyAndAurora {
         uSunElevation: { value: -0.2 },
         uStarIntensity: { value: 1.0 },
         uAuroraIntensity: { value: 1.0 },
+        uMobileBoost: { value: mobileBoost },
         uCloudTint: { value: new THREE.Color('#1a2d4c') },
-        uCloudOpacity: { value: 0.25 }
+        uCloudOpacity: { value: 0.4 }
       },
       vertexShader: SKY_VERTEX_SHADER,
       fragmentShader: SKY_FRAGMENT_SHADER
@@ -356,6 +389,7 @@ export class SkyAndAurora {
           uTime: { value: 0 },
           uNoiseTex: { value: noiseTex },
           uIntensity: { value: 1.0 },
+          uMobileBoost: { value: mobileBoost },
           uPhase: { value: spec.phase },
           uColorLow: { value: new THREE.Color(spec.low) },
           uColorMid: { value: new THREE.Color(spec.mid) },
