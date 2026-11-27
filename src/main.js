@@ -14,6 +14,9 @@ import { NorwegianCabins } from './scene/cabins.js';
 import { LuxuryChristmasTree } from './scene/christmasTree.js';
 import { NordicSnowmanFamily } from './scene/snowmanFamily.js';
 import { EnvironmentDetails } from './scene/environmentDetails.js';
+import { FestiveMeadow } from './scene/festiveMeadow.js';
+import { DistantLandscape } from './scene/distantLandscape.js';
+import { createSurfaceSampler, clearOccupiedDetails } from './scene/detailGeometry.js';
 import { CinematicCameraRig } from './scene/cameraRig.js';
 import { MagicParticles } from './scene/magicParticles.js';
 import { InteractionManager } from './scene/interactionManager.js';
@@ -91,6 +94,11 @@ function initNordicChristmas() {
   const christmasTree = new LuxuryChristmasTree(scene, perf);
   const snowmanFamily = new NordicSnowmanFamily(scene);
   const envDetails = new EnvironmentDetails(scene, perf);
+  const surface = createSurfaceSampler(perf);
+  const festiveMeadow = new FestiveMeadow(scene, surface);
+  const distantLandscape = new DistantLandscape(scene, surface);
+  clearOccupiedDetails(envDetails.group,
+    [...festiveMeadow.clearAreas, ...distantLandscape.clearAreas], distantLandscape.clearRoutes);
   const magicParticles = new MagicParticles(scene, perf.isMobile ? 1600 : 3600);
   const cameraRig = new CinematicCameraRig(camera, renderer.domElement);
   const audioEngine = new NordicAudioEngine();
@@ -275,6 +283,8 @@ function initNordicChristmas() {
     christmasTree.update(elapsed, dt, dayState);
     snowmanFamily.update(elapsed, dt, dayState);
     envDetails.update(elapsed, dt, dayState);
+    festiveMeadow.update(elapsed, dt, dayState);
+    distantLandscape.update(elapsed, dt, dayState);
     magicParticles.update(elapsed, dt);
     ui.updateTimeDisplay(dayState);
 

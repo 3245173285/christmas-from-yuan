@@ -197,6 +197,29 @@ const WATER_FRAGMENT_SHADER = /* glsl */ `
       color = mix(color, foamCol, clamp(foamAlpha * 0.65, 0.0, 0.55));
     }
 
+    // Local island shoreline and soft reflection. The original fjord/pond shading
+    // is identical outside this small neighborhood.
+    vec2 islandDelta = vWorldPos.xz - vec2(44.0, -87.0);
+    if (dot(islandDelta,islandDelta) < 900.0) {
+      vec2 ellipse = islandDelta / vec2(11.5, 8.7);
+      float a = atan(ellipse.x, ellipse.y);
+      float edgeR = 1.0 + 0.07*sin(a*5.0+0.8) + 0.035*cos(a*8.0-1.2);
+      float q = length(ellipse)/edgeR;
+      float islandFoam = exp(-pow((q-0.84-0.025*sin(uTime*1.8+a*6.0))*28.0,2.0));
+      float islandLap = 0.33 + 0.67*smoothstep(-0.3,0.8,sin(a*13.0-uTime*1.7));
+      color = mix(color, mix(vec3(0.20,0.30,0.38),vec3(0.63,0.75,0.80),1.0-uStarIntensity*.72), islandFoam*islandLap*.20);
+      float reflectT=max(0.0,-dot(islandDelta,R.xz)/max(.03,dot(R.xz,R.xz)));
+      float reflectedHeight=R.y*reflectT;
+      float footprint=length((islandDelta+R.xz*reflectT)/vec2(9.5,7.2));
+      float silhouette=(1.0-smoothstep(.68,1.04,footprint))*(1.0-smoothstep(2.0,6.6,reflectedHeight))*smoothstep(.2,2.0,reflectT);
+      color=mix(color,mix(vec3(.025,.046,.043),vec3(.09,.15,.15),1.0-uStarIntensity),silhouette*.39*reflMix);
+      vec2 lightDelta=islandDelta-vec2(.8,3.0);
+      float lightT=max(0.0,-dot(lightDelta,R.xz)/max(.03,dot(R.xz,R.xz)));
+      float lightGap=length(lightDelta+R.xz*lightT);
+      float glimmer=exp(-lightGap*lightGap*.65)*exp(-pow((R.y*lightT-3.3)*.46,2.0))*smoothstep(.5,2.0,lightT);
+      color+=vec3(.80,.48,.13)*glimmer*uCabinLightFactor*.23*(.55+.45*sin(uTime*3.0+vWorldPos.z*1.9));
+    }
+
     // Exponential atmospheric fog matching scene.fog
     float dist = length(cameraPosition - vWorldPos);
     float fogFactor = 1.0 - exp(-uFogDensity * uFogDensity * dist * dist);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GIFT_CARDS } from '../data/giftCards.js';
 import { CARD_STYLE_MAP } from '../data/wishCardsConfig.js';
 import { createGiftInterior } from './giftMiniatures.js';
+import { TreeDetails } from './treeDetails.js';
 import { getTerrainHeight, mulberry32 } from '../utils/noise.js';
 import {
   createBarkTexture,
@@ -163,6 +164,7 @@ export class LuxuryChristmasTree {
 
     this.rand = mulberry32(20251225);
     this.windUniforms = { uTime: { value: 0 } };
+    this.sprigSnow = { value: 0.94 };
     this.swayUniforms = { uTime: { value: 0 } };
 
     this.treeHeight = 11.4;
@@ -192,6 +194,7 @@ export class LuxuryChristmasTree {
     this.buildGiftBoxes();
     this.buildTreeLighting();
     this.initHangingCardResources();
+    this.detailOrnaments = new TreeDetails(this, getTreeRadiusAtHeight);
   }
 
   initHangingCardResources() {
@@ -611,15 +614,20 @@ export class LuxuryChristmasTree {
     // Inject natural gentle breeze sway into vertex shader
     needleMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = this.windUniforms.uTime;
+      shader.uniforms.uSprigSnow = this.sprigSnow;
       shader.vertexShader = shader.vertexShader.replace(
         '#include <common>',
         `#include <common>
-         uniform float uTime;`
+         uniform float uTime;
+         varying vec3 vNeedleFrost;`
       );
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
          vec4 instOrigin = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+         float snowPatch = fract(sin(dot(instOrigin.xyz, vec3(19.17, 41.83, 73.61))) * 43758.5453);
+         float upward = abs(normalize(mat3(instanceMatrix) * normal).y);
+         vNeedleFrost = vec3(position.x, position.y, snowPatch * upward);
          float radial = length(instOrigin.xz);
          float tipMask = clamp(position.y * 1.2, 0.0, 1.0);
          float swayPhase = uTime * 1.15 + instOrigin.x * 0.65 + instOrigin.z * 0.55 + instOrigin.y * 0.45;
@@ -628,6 +636,16 @@ export class LuxuryChristmasTree {
          transformed.z += cos(swayPhase * 0.82) * swayAmt * 0.75;
          transformed.y += sin(swayPhase * 1.4) * swayAmt * 0.25;`
       );
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>
+        uniform float uSprigSnow;
+        varying vec3 vNeedleFrost;`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        // Irregular crystalline dust only on exposed, upward-facing needle tips.
+        float frostPatch = smoothstep(0.36, 0.83, vNeedleFrost.z);
+        float frostTip = smoothstep(0.09, 0.62, vNeedleFrost.y);
+        float frostEdge = 0.60 + 0.40 * sin(vNeedleFrost.x * 87.0 + vNeedleFrost.y * 31.0);
+        float frost = frostPatch * frostTip * frostEdge * smoothstep(0.35, 0.93, uSprigSnow) * 0.78;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.79, 0.87, 0.93), frost);`);
     };
 
     const instMesh = new THREE.InstancedMesh(sprigGeo, needleMat, targetCount);
@@ -636,7 +654,7 @@ export class LuxuryChristmasTree {
 
     const dummy = new THREE.Object3D();
     const color = new THREE.Color();
-    // Subtle luminous tints (sprigTex already carries deep Nordic spruce green — avoid double-darkening!)
+    // Subtle luminous tints (sprigTex already carries deep Nordic spruce green �� avoid double-darkening!)
     const deepGreen = new THREE.Color('#a8ccb2');
     const midGreen = new THREE.Color('#e2f5e6');
     const frostTip = new THREE.Color('#eef7fb');
@@ -1058,12 +1076,16 @@ export class LuxuryChristmasTree {
           // Golden starlight cascade wave rippling from tree crown down to base!
           float distToWave = abs(position.y - uWaveY);
           float waveBand = exp(-distToWave * distToWave * 0.52) * uWaveBoost;
+          float idleProgress = mod(uTime + 4.0, 19.0) / 4.4;
+          float idleEnvelope = sin(clamp(idleProgress, 0.0, 1.0) * 3.14159265);
+          float idleDist = position.y - mix(0.7, 11.8, clamp(idleProgress, 0.0, 1.0));
+          float idleWave = exp(-idleDist * idleDist * 1.25) * idleEnvelope * (1.0 - clamp(uWaveBoost, 0.0, 1.0));
           // Sparkling golden-white surge as wave passes each light
           vColor = mix(aColor, vec3(1.0, 0.94, 0.68), clamp(waveBand * 0.85, 0.0, 1.0));
 
           float slowWave = 0.68 + 0.32 * sin(uTime * (1.2 + fract(aPhase) * 1.9) + aPhase * 6.2831);
           float sparkle = pow(0.5 + 0.5 * sin(uTime * (3.1 + fract(aPhase * 3.7) * 2.5) + aPhase * 17.0), 6.0);
-          vTwinkle = (slowWave + sparkle * 0.65) * uIntensity + waveBand * 2.6;
+          vTwinkle = (slowWave + sparkle * 0.65 + idleWave * 0.48) * uIntensity + waveBand * 2.6;
 
           vec3 pos = position;
           float sway = sin(uTime * 1.15 + pos.x * 0.65 + pos.z * 0.55 + pos.y * 0.45) * 0.035;
@@ -1517,7 +1539,7 @@ export class LuxuryChristmasTree {
 
     // Intimate hero close-up looking gently down into the hollow opened gift box!
     // Shift lookAt toward camera's RIGHT (+rightDir) so the opened 3D gift box + teddy bear + 3D card
-    // appear cleanly centered in the LEFT half of the viewport — completely unobstructed by the right-side card!
+    // appear cleanly centered in the LEFT half of the viewport �� completely unobstructed by the right-side card!
     const outDir = new THREE.Vector3(Math.sin(gift.angle), 0, Math.cos(gift.angle)).normalize();
     const cameraRight = new THREE.Vector3(outDir.z, 0, -outDir.x);
 
@@ -1573,6 +1595,8 @@ export class LuxuryChristmasTree {
   }
 
   update(elapsedTime, dt, dayState) {
+    this.sprigSnow.value = dayState.snowCover;
+    this.detailOrnaments.update(elapsedTime, dayState);
     this.windUniforms.uTime.value = elapsedTime;
     this.swayUniforms.uTime.value = elapsedTime;
 
