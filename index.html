@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CHRISTMAS FROM YUAN — 北欧极光圣诞之境</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="canvas-container"></div>
+
+    <!-- Interactive Frosted-Ice Intro Overlay -->
+    <div id="frost-intro" aria-label="冰封极光开屏">
+      <canvas id="frost-canvas"></canvas>
+      <canvas id="frost-fx-canvas"></canvas>
+
+      <div class="frost-center-copy">
+        <h1 class="frost-title">CHRISTMAS FROM YUAN</h1>
+        <p class="frost-subtitle">A little magic beneath the northern lights.</p>
+        <div id="frost-hint">按住鼠标左键划开冰面 · Hold &amp; drag to melt the ice</div>
+      </div>
+
+      <div class="frost-enter-wrap">
+        <button id="btn-enter-scene" class="liquid-enter-btn" type="button">
+          <span>进入极光之境 · Enter</span>
+          <svg viewBox="0 0 24 24">
+            <line x1="5" y1="12" x2="19" y2="12" />
+            <polyline points="13 6 19 12 13 18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Apple Liquid Glass HUD -->
+    <div id="hud-root" class="is-awaiting-intro">
+      <header class="hero-header">
+        <h1 class="hero-title">CHRISTMAS FROM YUAN</h1>
+        <p class="hero-subtitle">A little magic beneath the northern lights.</p>
+      </header>
+
+      <!-- Subtle Top-Right Liquid Glass Interactive Gift Counter & Magic Guide -->
+      <div class="magic-corner">
+        <button id="gift-counter-badge" class="liquid-badge" type="button" title="查看互动玩法提示">
+          <svg viewBox="0 0 24 24">
+            <polyline points="20 12 20 22 4 22 4 12" />
+            <rect x="2" y="7" width="20" height="5" />
+            <line x1="12" y1="22" x2="12" y2="7" />
+            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+          </svg>
+          <span id="gift-counter-text">0 / 10</span>
+        </button>
+        <div id="magic-hint-toast" class="magic-hint-toast">
+          <div>✦ 点击<strong>树顶金星</strong> · 倾泻星光波浪</div>
+          <div>♪ 点击<strong>树上挂球</strong> · 晃动奏响八音盒</div>
+          <div>🎁 点击<strong>金光礼盒</strong> · 拉近拆复古贺卡</div>
+          <div>☄ 点击<strong>夜空任意处</strong> · 召唤许愿流星</div>
+        </div>
+      </div>
+
+      <footer class="liquid-dock" aria-label="场景控制面板">
+        <div class="timeline-row">
+          <div class="time-readout">
+            <span id="virtual-clock">21:15</span>
+            <span id="phase-label">极光夜景</span>
+          </div>
+          <div class="slider-wrap">
+            <input
+              id="time-slider"
+              type="range"
+              min="0"
+              max="24"
+              step="0.02"
+              value="21.25"
+              aria-label="24小时场景时间滑块"
+            />
+          </div>
+        </div>
+
+        <div class="toolbar-row">
+          <!-- Playback & Speed -->
+          <div class="tool-group">
+            <button id="btn-play" class="icon-btn is-active" title="暂停/播放时间 (Space)" aria-label="暂停时间">
+              <svg viewBox="0 0 24 24">
+                <line x1="8" y1="5" x2="8" y2="19" />
+                <line x1="16" y1="5" x2="16" y2="19" />
+              </svg>
+            </button>
+            <button id="btn-speed" class="pill-btn speed-btn" title="调节时间流速">1×</button>
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <!-- 4 One-Click Time Presets -->
+          <div class="tool-group">
+            <button class="pill-btn" data-preset="dawn" title="切换至清晨">清晨</button>
+            <button class="pill-btn" data-preset="noon" title="切换至正午">正午</button>
+            <button class="pill-btn" data-preset="dusk" title="切换至黄昏">黄昏</button>
+            <button class="pill-btn is-active" data-preset="aurora" title="切换至极光夜景">极光夜景</button>
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <!-- Environment & Snow Size Controls -->
+          <div class="tool-group">
+            <div class="snow-control-capsule" title="降雪开关与降雪强度调节（小雪 → 大雪）">
+              <button id="btn-snow" class="icon-btn is-active" title="降雪开关" aria-label="降雪开关">
+                <svg viewBox="0 0 24 24">
+                  <line x1="12" y1="2" x2="12" y2="22" />
+                  <line x1="3.34" y1="7" x2="20.66" y2="17" />
+                  <line x1="20.66" y1="7" x2="3.34" y2="17" />
+                  <circle cx="12" cy="12" r="2.2" />
+                </svg>
+              </button>
+              <input
+                id="snow-size-slider"
+                type="range"
+                min="0.08"
+                max="1.0"
+                step="0.02"
+                value="0.48"
+                aria-label="调节降雪强度"
+              />
+            </div>
+
+            <button id="btn-orbit" class="icon-btn is-active" title="自动电影运镜" aria-label="自动运镜">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a8 8 0 1 0-2.6 3.5" />
+                <polyline points="20 11 20 15.5 15.5 15.5" />
+              </svg>
+            </button>
+
+            <button id="btn-audio" class="icon-btn" title="背景音乐与冬日环境音" aria-label="音频开关">
+              <svg viewBox="0 0 24 24">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </svg>
+            </button>
+
+            <button id="btn-fullscreen" class="icon-btn" title="全屏沉浸模式" aria-label="全屏模式">
+              <svg viewBox="0 0 24 24">
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            </button>
+
+            <button id="btn-hide-ui" class="icon-btn" title="隐藏全部UI (H)" aria-label="纯观赏模式">
+              <svg viewBox="0 0 24 24">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+                <circle cx="12" cy="12" r="3" />
+                <line x1="3" y1="3" x2="21" y2="21" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <button id="restore-ui-btn" title="恢复界面 (H)">显示界面 · H</button>
+
+    <!-- Heirloom Vintage Christmas Greeting Card Modal -->
+    <div id="vintage-card-modal" class="vintage-modal" aria-hidden="true">
+      <article id="vintage-card-paper" class="vintage-card" data-theme="gold">
+        <div class="vintage-frame-outer">
+          <div class="vintage-frame-inner">
+            <!-- Ornate Vintage Corner Filigree Marks -->
+            <span class="vc-corner vc-tl">✦</span>
+            <span class="vc-corner vc-tr">✦</span>
+            <span class="vc-corner vc-bl">✦</span>
+            <span class="vc-corner vc-br">✦</span>
+
+            <div class="vc-header">
+              <div class="vc-number" id="card-number">No. 01 / 10</div>
+              <div class="vc-emblem">
+                <svg viewBox="0 0 64 28" aria-hidden="true">
+                  <path d="M4 14 H22 M42 14 H60" stroke="currentColor" stroke-width="0.9" opacity="0.65" />
+                  <polygon points="32,2 34.8,10.5 43,14 34.8,17.5 32,26 29.2,17.5 21,14 29.2,10.5" fill="currentColor" />
+                </svg>
+              </div>
+              <div class="vc-tag" id="card-tag">FIRST SNOW · 初雪之约</div>
+            </div>
+
+            <h2 class="vc-title" id="card-title">愿今冬所有温柔如期而至</h2>
+            <p class="vc-body-zh" id="card-zh"></p>
+            <p class="vc-body-en" id="card-en"></p>
+
+            <div class="vc-footer">
+              <div class="vc-signature">
+                <span class="vc-sig-label">CHRISTMAS FROM</span>
+                <span class="vc-sig-name">Yuan</span>
+              </div>
+              <div class="vc-wax-seal" aria-hidden="true">
+                <span>Y</span>
+              </div>
+            </div>
+
+            <button id="btn-close-card" class="vc-close-btn" type="button">合上礼盒 · Close</button>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

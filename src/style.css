@@ -1,0 +1,993 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #040814;
+  color: #f4f1ea;
+  font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, 'Times New Roman', serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#canvas-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+#canvas-container canvas:active {
+  cursor: grabbing;
+}
+
+/* =========================================================
+   Interactive Frosted-Ice Intro Overlay
+   ========================================================= */
+#frost-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(40px, 9vh, 88px) 24px clamp(38px, 7vh, 66px);
+  cursor: grab;
+  transition: opacity 0.95s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.95s;
+}
+
+#frost-intro.is-carving {
+  cursor: grabbing;
+}
+
+#frost-intro.is-melting {
+  pointer-events: none;
+}
+
+#frost-intro.is-melting .frost-center-copy,
+#frost-intro.is-melting .frost-enter-wrap {
+  opacity: 0;
+  transform: translateY(14px) scale(0.97);
+}
+
+#frost-intro.is-gone {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#frost-canvas,
+#frost-fx-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#frost-canvas {
+  z-index: 41;
+}
+
+#frost-fx-canvas {
+  z-index: 42;
+}
+
+.frost-center-copy {
+  position: relative;
+  z-index: 45;
+  margin-top: auto;
+  margin-bottom: auto;
+  text-align: center;
+  pointer-events: none;
+  padding: 26px 46px;
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.frost-title {
+  font-size: clamp(2rem, 4.6vw, 3.85rem);
+  font-weight: 300;
+  letter-spacing: 0.34em;
+  padding-left: 0.34em;
+  background: linear-gradient(180deg, #ffffff 0%, #eaf3fc 52%, #bdd7ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 6px 26px rgba(2, 10, 24, 0.85));
+  line-height: 1.2;
+}
+
+.frost-title::after {
+  content: '';
+  display: block;
+  width: 64px;
+  height: 1px;
+  margin: 18px auto 0;
+  background: linear-gradient(90deg, transparent, rgba(212, 234, 255, 0.65), transparent);
+}
+
+.frost-subtitle {
+  margin-top: 15px;
+  font-size: clamp(0.98rem, 1.4vw, 1.22rem);
+  font-weight: 300;
+  font-style: italic;
+  letter-spacing: 0.12em;
+  color: rgba(214, 232, 248, 0.82);
+  text-shadow: 0 2px 16px rgba(2, 8, 20, 0.85);
+}
+
+#frost-hint {
+  margin-top: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  color: rgba(238, 246, 255, 0.88);
+  background: rgba(12, 24, 44, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: opacity 0.8s ease;
+}
+
+#frost-hint.is-soft {
+  opacity: 0.42;
+}
+
+.frost-enter-wrap {
+  position: relative;
+  z-index: 46;
+  pointer-events: auto;
+  transition: opacity 0.65s ease, transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Apple Liquid Glass Primary Enter Button */
+.liquid-enter-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(210, 232, 255, 0.12) 48%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
+  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
+  box-shadow:
+    0 18px 46px rgba(4, 12, 28, 0.45),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.62),
+    inset 0 -1px 1.5px rgba(175, 215, 255, 0.22);
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  text-shadow: 0 1px 8px rgba(4, 10, 24, 0.45);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.liquid-enter-btn:hover {
+  transform: translateY(-2px) scale(1.035);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.34) 0%,
+    rgba(220, 238, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.26) 100%
+  );
+  box-shadow:
+    0 22px 54px rgba(4, 14, 34, 0.52),
+    0 0 28px rgba(180, 224, 255, 0.28),
+    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.78),
+    inset 0 -1px 1.5px rgba(190, 224, 255, 0.3);
+}
+
+.liquid-enter-btn:active {
+  transform: scale(0.97);
+}
+
+.liquid-enter-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* =========================================================
+   Main Scene HUD & Apple Liquid Glass Bottom Dock
+   ========================================================= */
+#hud-root {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: clamp(22px, 3.2vh, 38px) clamp(14px, 2.8vw, 34px) clamp(18px, 2.8vh, 30px);
+  transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#hud-root.is-awaiting-intro {
+  opacity: 0;
+  transform: translateY(14px);
+  pointer-events: none;
+}
+
+#hud-root.is-awaiting-intro * {
+  pointer-events: none !important;
+}
+
+#hud-root.is-idle {
+  opacity: 0.18;
+}
+
+#hud-root.is-idle:hover {
+  opacity: 1;
+}
+
+#hud-root.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#hud-root.is-hidden * {
+  pointer-events: none !important;
+}
+
+/* Top Editorial Header */
+.hero-header {
+  position: relative;
+  text-align: center;
+  pointer-events: none;
+  padding: 6px 28px 10px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(6, 12, 24, 0.34) 0%, rgba(6, 12, 24, 0) 72%);
+  text-shadow: 0 2px 18px rgba(4, 10, 22, 0.72), 0 1px 4px rgba(4, 10, 22, 0.55);
+}
+
+.hero-title {
+  font-size: clamp(1.25rem, 2.35vw, 2.15rem);
+  font-weight: 400;
+  letter-spacing: 0.32em;
+  padding-left: 0.32em;
+  color: rgba(251, 248, 242, 0.97);
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  margin-top: 7px;
+  font-size: clamp(0.86rem, 1.15vw, 1.06rem);
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  color: rgba(242, 236, 224, 0.88);
+}
+
+/* Authentic Apple Liquid Glass Bottom Dock (iOS 26 / visionOS refraction aesthetic) */
+.liquid-dock {
+  --mx: 50%;
+  --my: 0%;
+  position: relative;
+  pointer-events: auto;
+  width: min(820px, 95vw);
+  padding: 13px 20px 12px;
+  border-radius: 28px;
+  overflow: hidden;
+
+  /* Translucent multi-stop refractive glass base */
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(195, 218, 245, 0.08) 46%,
+    rgba(255, 255, 255, 0.13) 100%
+  );
+  backdrop-filter: blur(32px) saturate(210%) brightness(1.06);
+  -webkit-backdrop-filter: blur(32px) saturate(210%) brightness(1.06);
+
+  /* Signature Apple Liquid Glass specular edge refraction & floating depth */
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 22px 56px rgba(2, 8, 22, 0.44),
+    0 2px 12px rgba(2, 8, 22, 0.24),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.56),
+    inset 0 -1px 1.5px rgba(255, 255, 255, 0.16),
+    inset 1px 0 1px rgba(255, 255, 255, 0.22),
+    inset -1px 0 1px rgba(255, 255, 255, 0.12);
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Cursor-tracking dynamic liquid specular reflection inside glass surface */
+.liquid-dock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    360px circle at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(210, 236, 255, 0.08) 38%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  transition: opacity 0.3s ease;
+}
+
+/* Subtle top glass refraction highlight hairline */
+.liquid-dock::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.65) 35%,
+    rgba(220, 240, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0.65) 65%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Row 1: Slender 24-Hour Liquid Timeline */
+.timeline-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.time-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 118px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+}
+
+#virtual-clock {
+  font-size: 0.94rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 252, 245, 0.96);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+#phase-label {
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: rgba(242, 247, 255, 0.78);
+}
+
+.slider-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 18px;
+}
+
+#time-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    90deg,
+    rgba(16, 44, 86, 0.85) 0%,
+    rgba(32, 66, 114, 0.85) 18%,
+    rgba(196, 122, 148, 0.9) 27%,
+    rgba(246, 202, 146, 0.95) 38%,
+    rgba(116, 184, 242, 0.95) 54%,
+    rgba(242, 152, 92, 0.95) 68%,
+    rgba(82, 70, 142, 0.9) 78%,
+    rgba(34, 178, 146, 0.92) 88%,
+    rgba(16, 44, 86, 0.85) 100%
+  );
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3), 0 0.5px 0 rgba(255, 255, 255, 0.32);
+}
+
+#time-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e9f2fc 70%, #cddff4 100%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 12px rgba(255, 255, 255, 0.55);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#time-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.22);
+}
+
+#time-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* Row 2: Apple Liquid Glass Controls Toolbar */
+.toolbar-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tool-divider {
+  width: 1px;
+  height: 18px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  margin: 0 2px;
+}
+
+.icon-btn,
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+  color: rgba(248, 251, 255, 0.86);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.25);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.icon-btn {
+  width: 31px;
+  height: 31px;
+}
+
+.pill-btn {
+  height: 30px;
+  padding: 0 12px;
+}
+
+.icon-btn svg,
+.pill-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-btn:hover,
+.pill-btn:hover {
+  transform: translateY(-1px) scale(1.04);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.11) 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18), inset 0 1px 0.8px rgba(255, 255, 255, 0.52);
+}
+
+.icon-btn:active,
+.pill-btn:active {
+  transform: scale(0.95);
+}
+
+.icon-btn.is-active,
+.pill-btn.is-active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(220, 236, 255, 0.18) 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.52);
+  box-shadow:
+    0 4px 16px rgba(10, 25, 55, 0.26),
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    inset 0 -1px 1px rgba(180, 215, 255, 0.22);
+}
+
+.speed-btn {
+  min-width: 38px;
+  padding: 0 8px;
+  height: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Snow Size Liquid Glass Capsule Control */
+.snow-control-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.22);
+}
+
+.snow-control-capsule .icon-btn {
+  width: 27px;
+  height: 27px;
+  border: none;
+}
+
+#snow-size-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 58px;
+  height: 3.5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  outline: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+#snow-size-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35), 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+#snow-size-slider::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+}
+
+/* Pure View Restore Pill (Apple Liquid Glass) */
+#restore-ui-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 22px;
+  z-index: 20;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3), inset 0 1px 0.8px rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s ease, visibility 0.35s ease, transform 0.25s ease;
+}
+
+#restore-ui-btn.is-visible {
+  opacity: 0.48;
+  visibility: visible;
+}
+
+#restore-ui-btn.is-visible:hover {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+@media (max-width: 680px) {
+  .liquid-dock {
+    padding: 11px 13px;
+    border-radius: 22px;
+  }
+  .time-readout {
+    min-width: 96px;
+  }
+  .toolbar-row {
+    justify-content: center;
+  }
+  #snow-size-slider {
+    width: 46px;
+  }
+}
+
+/* =========================================================
+   Top-Right Liquid Glass Gift Progress Pill & Magic Hints
+   ========================================================= */
+.magic-corner {
+  position: fixed;
+  top: clamp(20px, 3vh, 34px);
+  right: clamp(16px, 2.6vw, 32px);
+  z-index: 15;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.liquid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 240, 200, 0.34);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.2) 0%, rgba(210, 228, 250, 0.08) 100%);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  box-shadow: 0 10px 28px rgba(2, 8, 22, 0.35), inset 0 1px 0.8px rgba(255, 255, 255, 0.52);
+  color: #fff3d2;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease;
+}
+
+.liquid-badge:hover {
+  transform: scale(1.05);
+  background: linear-gradient(145deg, rgba(255, 244, 214, 0.28) 0%, rgba(255, 255, 255, 0.12) 100%);
+}
+
+.liquid-badge.is-pulse {
+  animation: badgePop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes badgePop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.16); box-shadow: 0 0 24px rgba(255, 214, 118, 0.65); }
+  100% { transform: scale(1); }
+}
+
+.liquid-badge svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: #ffd982;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.magic-hint-toast {
+  padding: 11px 15px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: linear-gradient(160deg, rgba(16, 28, 48, 0.68) 0%, rgba(8, 16, 30, 0.78) 100%);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0.8px rgba(255, 255, 255, 0.35);
+  color: rgba(240, 246, 255, 0.86);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  font-size: 0.74rem;
+  line-height: 1.72;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.magic-hint-toast strong {
+  color: #fce0a2;
+  font-weight: 500;
+}
+
+.magic-hint-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* =========================================================
+   Heirloom Vintage Christmas Greeting Card Modal
+   (Positioned gracefully on the right so the razor-sharp opened hollow 3D gift box + teddy bear + nestled 3D card remain in full view on the left!)
+   ========================================================= */
+.vintage-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 24px clamp(24px, 6.5vw, 96px) 24px 24px;
+  background: linear-gradient(
+    90deg,
+    rgba(2, 6, 16, 0.04) 0%,
+    rgba(2, 6, 16, 0.14) 48%,
+    rgba(2, 6, 16, 0.52) 100%
+  );
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.48s ease, visibility 0.48s ease;
+}
+
+@media (max-width: 820px) {
+  .vintage-modal {
+    justify-content: center;
+    padding: 20px;
+    background: rgba(2, 6, 16, 0.48);
+  }
+}
+
+.vintage-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.vintage-card {
+  width: min(468px, 92vw);
+  padding: 12px;
+  border-radius: 10px;
+  /* Warm heirloom cotton parchment paper */
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 253, 246, 0.96) 0%, rgba(246, 237, 219, 0.98) 52%, rgba(232, 217, 190, 0.98) 100%);
+  box-shadow:
+    0 32px 84px rgba(0, 0, 0, 0.65),
+    0 6px 24px rgba(0, 0, 0, 0.35),
+    0 0 42px rgba(245, 206, 128, 0.22),
+    inset 0 0 38px rgba(174, 134, 72, 0.16);
+  color: #2c2118;
+  transform: translateY(26px) scale(0.92) rotateX(8deg);
+  transition: transform 0.62s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+
+.vintage-modal.is-open .vintage-card {
+  transform: translateY(0) scale(1) rotateX(0deg);
+}
+
+/* Subtle accent color themes for the embossed gold/crimson/emerald/sapphire frames */
+.vintage-card[data-theme='crimson'] {
+  --vc-accent: #861d28;
+  --vc-gold: #b48a42;
+}
+.vintage-card[data-theme='emerald'] {
+  --vc-accent: #1d5742;
+  --vc-gold: #b08840;
+}
+.vintage-card[data-theme='sapphire'] {
+  --vc-accent: #1f4578;
+  --vc-gold: #b08840;
+}
+.vintage-card[data-theme='rose'] {
+  --vc-accent: #8f464e;
+  --vc-gold: #b88850;
+}
+.vintage-card[data-theme='gold'] {
+  --vc-accent: #8c6224;
+  --vc-gold: #b88c3e;
+}
+
+.vintage-frame-outer {
+  border: 1.5px solid var(--vc-gold, #b88c3e);
+  padding: 5px;
+  border-radius: 6px;
+}
+
+.vintage-frame-inner {
+  position: relative;
+  border: 1px solid rgba(176, 136, 64, 0.48);
+  border-radius: 4px;
+  padding: 28px 30px 24px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 252, 244, 0.5) 0%, rgba(242, 229, 204, 0.25) 100%);
+}
+
+.vc-corner {
+  position: absolute;
+  font-size: 0.72rem;
+  color: var(--vc-gold, #b88c3e);
+  opacity: 0.82;
+  line-height: 1;
+}
+.vc-tl { top: 8px; left: 10px; }
+.vc-tr { top: 8px; right: 10px; }
+.vc-bl { bottom: 8px; left: 10px; }
+.vc-br { bottom: 8px; right: 10px; }
+
+.vc-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.vc-number {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  color: rgba(112, 82, 42, 0.78);
+}
+
+.vc-emblem {
+  width: 68px;
+  height: 26px;
+  color: var(--vc-gold, #b88c3e);
+}
+
+.vc-emblem svg {
+  width: 100%;
+  height: 100%;
+}
+
+.vc-tag {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--vc-accent, #8c6224);
+  text-transform: uppercase;
+}
+
+.vc-title {
+  margin-top: 16px;
+  font-family: 'Cormorant Garamond', 'Songti SC', 'STSong', Georgia, serif;
+  font-size: clamp(1.28rem, 2.2vw, 1.56rem);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #241911;
+  line-height: 1.38;
+}
+
+.vc-body-zh {
+  margin-top: 16px;
+  font-family: 'Songti SC', 'Noto Serif SC', 'STSong', Georgia, serif;
+  font-size: 0.96rem;
+  line-height: 1.92;
+  color: #3d2f23;
+  text-align: center;
+}
+
+.vc-body-en {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(176, 136, 64, 0.28);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.96rem;
+  font-style: italic;
+  line-height: 1.55;
+  color: #6b5642;
+}
+
+.vc-footer {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+.vc-signature {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.vc-sig-label {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  color: rgba(110, 84, 52, 0.72);
+}
+
+.vc-sig-name {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.48rem;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--vc-accent, #861d28);
+  line-height: 1.1;
+}
+
+/* Embossed Crimson Lacquer Wax Seal Stamp */
+.vc-wax-seal {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 32% 28%, #b82936 0%, #861420 55%, #5b0a12 100%);
+  border: 2px solid rgba(154, 34, 46, 0.85);
+  box-shadow:
+    0 5px 14px rgba(55, 8, 14, 0.42),
+    inset 0 2px 3px rgba(255, 180, 180, 0.32),
+    inset 0 -3px 5px rgba(38, 4, 8, 0.55);
+  transform: rotate(-8deg);
+}
+
+.vc-wax-seal span {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.32rem;
+  font-weight: 600;
+  color: #f3d295;
+  text-shadow: 0 1px 2px rgba(45, 5, 8, 0.8);
+}
+
+.vc-close-btn {
+  margin-top: 20px;
+  padding: 9px 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 114, 52, 0.48);
+  background: linear-gradient(180deg, rgba(255, 250, 238, 0.9) 0%, rgba(235, 220, 190, 0.9) 100%);
+  color: #45311d;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(92, 62, 24, 0.14);
+  transition: transform 0.22s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vc-close-btn:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, #fffdf7 0%, #f0e1c2 100%);
+  box-shadow: 0 6px 16px rgba(92, 62, 24, 0.22);
+}
+
