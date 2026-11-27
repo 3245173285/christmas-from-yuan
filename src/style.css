@@ -165,7 +165,7 @@ body {
   transition: opacity 0.65s ease, transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Apple Liquid Glass Primary Enter Button */
+/* Scandinavian Matte Frosted Primary Enter Button */
 .liquid-enter-btn {
   position: relative;
   display: inline-flex;
@@ -173,42 +173,25 @@ body {
   gap: 10px;
   padding: 13px 34px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.26) 0%,
-    rgba(210, 232, 255, 0.12) 48%,
-    rgba(255, 255, 255, 0.2) 100%
-  );
-  backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
-  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.08);
-  box-shadow:
-    0 18px 46px rgba(4, 12, 28, 0.45),
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.62),
-    inset 0 -1px 1.5px rgba(175, 215, 255, 0.22);
-  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(16, 26, 44, 0.56);
+  backdrop-filter: blur(18px) saturate(110%);
+  -webkit-backdrop-filter: blur(18px) saturate(110%);
+  box-shadow: 0 12px 32px rgba(2, 8, 22, 0.36);
+  color: rgba(248, 251, 255, 0.96);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
   font-size: 0.9rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   cursor: pointer;
-  text-shadow: 0 1px 8px rgba(4, 10, 24, 0.45);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, background 0.3s ease;
+  transition: transform 0.26s ease, box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease;
 }
 
 .liquid-enter-btn:hover {
-  transform: translateY(-2px) scale(1.035);
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.34) 0%,
-    rgba(220, 238, 255, 0.18) 50%,
-    rgba(255, 255, 255, 0.26) 100%
-  );
-  box-shadow:
-    0 22px 54px rgba(4, 14, 34, 0.52),
-    0 0 28px rgba(180, 224, 255, 0.28),
-    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.78),
-    inset 0 -1px 1.5px rgba(190, 224, 255, 0.3);
+  transform: translateY(-2px);
+  background: rgba(24, 38, 62, 0.68);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 16px 38px rgba(2, 8, 24, 0.44);
 }
 
 .liquid-enter-btn:active {
@@ -299,75 +282,30 @@ body {
   color: rgba(242, 236, 224, 0.88);
 }
 
-/* Authentic Apple Liquid Glass Bottom Dock (iOS 26 / visionOS refraction aesthetic) */
+/* Understated Nordic Matte Frosted Glass Bottom Dock (clean, soft, non-glossy frosted finish) */
 .liquid-dock {
-  --mx: 50%;
-  --my: 0%;
   position: relative;
   pointer-events: auto;
   width: min(820px, 95vw);
   padding: 13px 20px 12px;
-  border-radius: 28px;
+  border-radius: 24px;
   overflow: hidden;
 
-  /* Translucent multi-stop refractive glass base */
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.18) 0%,
-    rgba(195, 218, 245, 0.08) 46%,
-    rgba(255, 255, 255, 0.13) 100%
-  );
-  backdrop-filter: blur(32px) saturate(210%) brightness(1.06);
-  -webkit-backdrop-filter: blur(32px) saturate(210%) brightness(1.06);
-
-  /* Signature Apple Liquid Glass specular edge refraction & floating depth */
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow:
-    0 22px 56px rgba(2, 8, 22, 0.44),
-    0 2px 12px rgba(2, 8, 22, 0.24),
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.56),
-    inset 0 -1px 1.5px rgba(255, 255, 255, 0.16),
-    inset 1px 0 1px rgba(255, 255, 255, 0.22),
-    inset -1px 0 1px rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 36, 0.62);
+  backdrop-filter: blur(20px) saturate(110%);
+  -webkit-backdrop-filter: blur(20px) saturate(110%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 40px rgba(2, 6, 16, 0.38);
 
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* Cursor-tracking dynamic liquid specular reflection inside glass surface */
-.liquid-dock::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(
-    360px circle at var(--mx) var(--my),
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(210, 236, 255, 0.08) 38%,
-    rgba(255, 255, 255, 0) 70%
-  );
-  transition: opacity 0.3s ease;
-}
-
-/* Subtle top glass refraction highlight hairline */
+/* Remove glossy liquid specular layers for pure silky matte frost */
+.liquid-dock::before,
 .liquid-dock::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 14px;
-  right: 14px;
-  height: 1px;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.65) 35%,
-    rgba(220, 240, 255, 0.8) 50%,
-    rgba(255, 255, 255, 0.65) 65%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  display: none;
 }
 
 /* Row 1: Slender 24-Hour Liquid Timeline */
@@ -489,17 +427,17 @@ body {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
-  color: rgba(248, 251, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(242, 246, 252, 0.86);
   border-radius: 999px;
   cursor: pointer;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
   font-size: 0.74rem;
   font-weight: 500;
   letter-spacing: 0.02em;
-  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.25);
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: none;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .icon-btn {
@@ -525,11 +463,10 @@ body {
 
 .icon-btn:hover,
 .pill-btn:hover {
-  transform: translateY(-1px) scale(1.04);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.11) 100%);
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.38);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18), inset 0 1px 0.8px rgba(255, 255, 255, 0.52);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .icon-btn:active,
@@ -539,13 +476,10 @@ body {
 
 .icon-btn.is-active,
 .pill-btn.is-active {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(220, 236, 255, 0.18) 100%);
+  background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.52);
-  box-shadow:
-    0 4px 16px rgba(10, 25, 55, 0.26),
-    inset 0 1px 1px rgba(255, 255, 255, 0.72),
-    inset 0 -1px 1px rgba(180, 215, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: none;
 }
 
 .speed-btn {
@@ -555,16 +489,16 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Snow Size Liquid Glass Capsule Control */
+/* Matte Frosted Snow Capsule Control */
 .snow-control-capsule {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 2px 10px 2px 2px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: none;
 }
 
 .snow-control-capsule .icon-btn {
@@ -603,7 +537,7 @@ body {
   border: none;
 }
 
-/* Pure View Restore Pill (Apple Liquid Glass) */
+/* Pure View Restore Pill (Matte Frosted) */
 #restore-ui-btn {
   position: fixed;
   bottom: 20px;
@@ -611,12 +545,12 @@ body {
   z-index: 20;
   padding: 8px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3), inset 0 1px 0.8px rgba(255, 255, 255, 0.45);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(16, 24, 38, 0.64);
+  backdrop-filter: blur(18px) saturate(110%);
+  -webkit-backdrop-filter: blur(18px) saturate(110%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  color: rgba(242, 246, 252, 0.9);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
   font-size: 0.74rem;
   font-weight: 500;
@@ -628,13 +562,13 @@ body {
 }
 
 #restore-ui-btn.is-visible {
-  opacity: 0.48;
+  opacity: 0.56;
   visibility: visible;
 }
 
 #restore-ui-btn.is-visible:hover {
   opacity: 1;
-  transform: scale(1.04);
+  transform: scale(1.03);
 }
 
 @media (max-width: 768px) {
@@ -656,17 +590,17 @@ body {
   .liquid-dock {
     width: min(420px, 94vw);
     padding: 12px 14px 11px;
-    border-radius: 26px;
+    border-radius: 22px;
     gap: 10px;
-    background: linear-gradient(155deg, rgba(22, 34, 54, 0.56) 0%, rgba(10, 18, 32, 0.64) 100%);
-    backdrop-filter: blur(10px) saturate(145%) brightness(1.04);
-    -webkit-backdrop-filter: blur(10px) saturate(145%) brightness(1.04);
+    background: rgba(15, 23, 36, 0.66);
+    backdrop-filter: blur(16px) saturate(108%);
+    -webkit-backdrop-filter: blur(16px) saturate(108%);
   }
   .liquid-enter-btn {
     padding: 12px 26px;
     font-size: 0.86rem;
-    backdrop-filter: blur(10px) saturate(145%);
-    -webkit-backdrop-filter: blur(10px) saturate(145%);
+    backdrop-filter: blur(16px) saturate(108%);
+    -webkit-backdrop-filter: blur(16px) saturate(108%);
   }
   .timeline-row {
     gap: 10px;
@@ -713,8 +647,8 @@ body {
     box-shadow: none;
   }
   .preset-group .pill-btn.is-active {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(220, 236, 255, 0.18) 100%);
-    border-color: rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.26);
   }
   .toolbar-row > .tool-group:first-child {
     order: 2;
@@ -1102,7 +1036,7 @@ body {
 }
 
 /* =========================================================
-   Dock "送贺卡" Golden Liquid Glass CTA Pill
+   Dock "送贺卡" Matte Warm-Gold Pill
    ========================================================= */
 .wish-cta-btn {
   display: inline-flex;
@@ -1110,11 +1044,11 @@ body {
   gap: 5px;
   padding: 0 12px;
   height: 32px;
-  border-color: rgba(255, 224, 152, 0.48);
-  background: linear-gradient(155deg, rgba(255, 218, 134, 0.28) 0%, rgba(196, 132, 48, 0.2) 100%);
-  color: #fff4d6;
+  border-color: rgba(235, 200, 128, 0.34);
+  background: rgba(214, 166, 78, 0.22);
+  color: #fff2d2;
   font-weight: 500;
-  box-shadow: 0 4px 16px rgba(255, 198, 96, 0.22), inset 0 1px 0.8px rgba(255, 246, 216, 0.55);
+  box-shadow: none;
 }
 
 .wish-cta-btn svg {
@@ -1128,7 +1062,8 @@ body {
 }
 
 .wish-cta-btn:hover {
-  background: linear-gradient(155deg, rgba(255, 226, 154, 0.42) 0%, rgba(214, 152, 64, 0.3) 100%);
+  background: rgba(226, 178, 88, 0.34);
+  border-color: rgba(244, 212, 142, 0.48);
   transform: translateY(-1px);
 }
 
@@ -1163,10 +1098,12 @@ body {
   max-height: min(90vh, 760px);
   display: flex;
   flex-direction: column;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: linear-gradient(160deg, rgba(16, 28, 48, 0.86) 0%, rgba(8, 15, 28, 0.92) 100%);
-  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.28);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 36, 0.86);
+  backdrop-filter: blur(22px) saturate(110%);
+  -webkit-backdrop-filter: blur(22px) saturate(110%);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.56);
   color: #f3f6fc;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
   overflow: hidden;
