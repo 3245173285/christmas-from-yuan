@@ -1623,7 +1623,7 @@ export class LuxuryChristmasTree {
     let starTurn = 0;
     if (this.starWaveTimer >= 0) {
       this.starWaveTimer += dt;
-      const waveDuration = 3.65;
+      const waveDuration = 4.05;
       const p = this.starWaveTimer / waveDuration;
       if (p >= 1.0) {
         this.starWaveTimer = -1;
@@ -1631,9 +1631,9 @@ export class LuxuryChristmasTree {
       } else {
         // Wave travels gracefully in sync with the 3 spiraling stardust ribbons from crown down to skirt
         this.fairyLightMat.uniforms.uWaveY.value = 11.7 - Math.pow(p, 0.94) * 11.3;
-        this.fairyLightMat.uniforms.uWaveBoost.value = Math.sin(p * Math.PI) * 0.32;
+        this.fairyLightMat.uniforms.uWaveBoost.value = Math.sin(p * Math.PI) * 0.38;
         const fadeIn = THREE.MathUtils.smoothstep(p, 0, 0.075);
-        starBurstBoost += fadeIn * Math.pow(1 - p, 2.3) * 0.26;
+        starBurstBoost += fadeIn * Math.pow(1 - p, 2.3) * 0.29;
         starTurn = Math.sin(p * Math.PI) * 0.23;
       }
     }

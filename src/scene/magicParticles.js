@@ -143,7 +143,7 @@ export class MagicParticles {
 
   // This channel alone is exposure-limited; gift and ornament particles stay unchanged.
   spawnStarParticle(x,y,z,vx,vy,vz,r,g,b,size,life,gravity,drag,swirl) {
-    this.spawnParticle(x,y,z,vx,vy,vz,r*.55,g*.55,b*.55,size*.75,life,gravity,drag,swirl);
+    this.spawnParticle(x,y,z,vx,vy,vz,r*.65,g*.65,b*.65,size*.77,life,gravity,drag,swirl);
   }
 
   // Grand Multi-Layer Starlight Symphony triggered when clicking the Tree-Top Golden Star!
@@ -152,10 +152,11 @@ export class MagicParticles {
   // Layer 3: Expanding golden stardust wave blooming across the snow & gift ring at finale!
   emitStarCascade(origin) {
     if (this.activeSpirals[0]?.age < .42) return;
-    const crownCount = 108;
+    const crownCount = 132;
+    const ringCount = 48;
     for (let k = 0; k < crownCount; k++) {
-      const a = (k / crownCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
-      const isRing = k < 38;
+      const isRing = k < ringCount;
+      const a = ((isRing ? k / ringCount : (k - ringCount) / (crownCount - ringCount))) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
       const speed = isRing ? (3.2 + Math.random() * 1.4) : (1.5 + Math.random() * 4.8);
       const vy = isRing ? ((Math.random() - 0.5) * 0.65) : (0.8 + Math.random() * 4.2);
 
@@ -193,7 +194,7 @@ export class MagicParticles {
         topY,
         baseY,
         age: 0,
-        duration: 3.65,
+        duration: 4.05,
         turns: 4.5,
         angleOffset: 0.0,
         colorA: [1.0, 0.88, 0.44],   // Champagne Gold
@@ -207,7 +208,7 @@ export class MagicParticles {
         topY,
         baseY,
         age: -0.14,
-        duration: 3.65,
+        duration: 4.05,
         turns: 4.5,
         angleOffset: (Math.PI * 2) / 3,
         colorA: [1.0, 0.95, 0.74],   // Warm Starlight Ivory
@@ -221,7 +222,7 @@ export class MagicParticles {
         topY,
         baseY,
         age: -0.28,
-        duration: 3.65,
+        duration: 4.05,
         turns: 4.5,
         angleOffset: (Math.PI * 4) / 3,
         colorA: [1.0, 0.88, 0.67],   // Pale Champagne
@@ -234,10 +235,10 @@ export class MagicParticles {
 
   emitSpiralGroundFinale(cx, baseY, cz) {
     // Graceful golden stardust wave blooming outward around the tree base & 34 gift boxes!
-    const count = 84;
+    const count = 112;
     for (let k = 0; k < count; k++) {
       const a = (k / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.1;
-      const startR = 4.6 + Math.random() * 0.9;
+      const startR = (k % 2 ? 5.15 : 4.55) + Math.random() * 0.45;
       const outSpd = 1.8 + Math.random() * 2.8;
       const warm = Math.random();
       this.spawnStarParticle(
@@ -369,7 +370,7 @@ export class MagicParticles {
         const tanX = -Math.sin(theta);
         const tanZ = Math.cos(theta);
 
-        // One separated spark per step, varied across the ribbon width.
+        // A bright core of separated sparks plus delicate, wider fairy dust.
         {
           const mixC = Math.random();
           const r = sp.colorA[0] * (1 - mixC) + sp.colorB[0] * mixC;
@@ -392,6 +393,15 @@ export class MagicParticles {
             0.976,
             0.35
           );
+          // Soft pearl pinpricks offset outward, avoiding a contiguous white bloom.
+          if (t > .12 && Math.random() < .43) {
+            const o = .20 + Math.random() * .41;
+            this.spawnStarParticle(px + Math.cos(theta) * o, y + (Math.random() - .5) * .26,
+              pz + Math.sin(theta) * o, tanX * .25 + Math.cos(theta) * .35,
+              -.32 - Math.random() * .45, tanZ * .25 + Math.sin(theta) * .35,
+              .86, .91, 1.0, .43 + Math.random() * .38, 1.5 + Math.random() * .8,
+              -.29, .983, .16);
+          }
         }
       }
 
@@ -400,7 +410,7 @@ export class MagicParticles {
         sprite.visible = true;
         sprite.position.set(headX, headY, headZ);
         const fade = Math.sin(p * Math.PI);
-        sprite.material.opacity = 0.25 * Math.min(1, fade * 2.1);
+        sprite.material.opacity = 0.30 * Math.min(1, fade * 2.1);
         const sc = 1.24 + Math.sin(p * Math.PI * 10) * 0.13;
         sprite.scale.set(sc, sc, 1);
       }

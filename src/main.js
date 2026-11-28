@@ -171,6 +171,7 @@ function initNordicChristmas() {
     envDetails,
     audioEngine
   });
+  ui.enableDefaultAudio();
 
   // Interactive Glacial-Ice Intro Overlay -> reveals Liquid Glass HUD smoothly upon >=40% wipe or Enter
   const hudRoot = document.getElementById('hud-root');

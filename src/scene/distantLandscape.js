@@ -4,6 +4,7 @@ import { getSharedNoiseLUTTexture } from '../utils/textures.js';
 import { primitives as P, v3, standard, part, beam, tube, extrude, bake, instanceTemplate, matrixAt } from './detailGeometry.js';
 import { buildDetailedLighthouse, LIGHTHOUSE } from './coastalDetails.js';
 import { buildAlpineWaterfall } from './alpineWaterfall.js';
+import { buildRearWoodland } from './rearWoodland.js';
 
 export const ISLAND = {x:44,z:-87,rx:11.5,rz:8.7};
 const HILL_CABINS = [[-84,-177,.62,1.14],[-100,-196,-.86,1.04],[-64,-201,.26,.96]];
@@ -32,6 +33,7 @@ export class DistantLandscape {
     this.buildIsland();this.buildHillside();
     this.lighthouse=buildDetailedLighthouse(this);
     this.buildSkyCameo();
+    buildRearWoodland(this);
     this.group.add(bake(this.static,{shadow:false,receive:false}));this.static.clear();
   }
   buildFarRanges(terrainMaterial){

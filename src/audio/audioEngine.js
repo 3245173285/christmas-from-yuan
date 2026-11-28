@@ -281,9 +281,10 @@ export class NordicAudioEngine {
 
   start() {
     this.init();
-    if (!this.ctx) return;
+    if (!this.ctx) return false;
+    if (this.isPlaying) return true; // init already attempts to resume a suspended context
     if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
     this.isPlaying = true;
     const now = this.ctx.currentTime;
@@ -298,6 +299,7 @@ export class NordicAudioEngine {
     this.chimeTimer = setInterval(() => {
       if (Math.random() > 0.25) this.triggerCelestaChime();
     }, 1850);
+    return true;
   }
 
   stop() {

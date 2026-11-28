@@ -1,5 +1,7 @@
 // Apple Liquid Glass UI Controller with Interactive Specular Sheen, Snow Size Slider & Pure View Mode
 
+const AUDIO_PREF = 'christmas_from_yuan_background_audio';
+
 const SPEEDS = [0.5, 1, 2, 4];
 
 const PRESETS = [
@@ -22,6 +24,9 @@ export class ControlsUI {
     this.cameraRig = cameraRig;
     this.envDetails = envDetails;
     this.audioEngine = audioEngine;
+    try { this.audioOptedOut = localStorage.getItem(AUDIO_PREF) === 'off'; }
+    catch (_) { this.audioOptedOut = false; }
+    this.audioUnlockCleanup = null;
 
     this.uiHidden = false;
     this.isScrubbing = false;
@@ -135,7 +140,10 @@ export class ControlsUI {
 
     // Ambient Audio toggle
     this.audioBtn.addEventListener('click', () => {
+      this.audioUnlockCleanup?.();
       this.audioEngine.toggle();
+      this.audioOptedOut = !this.audioEngine.isPlaying;
+      try { localStorage.setItem(AUDIO_PREF, this.audioOptedOut ? 'off' : 'on'); } catch (_) {}
       this.syncToggleStates();
       this.resetIdleFade();
     });
@@ -174,6 +182,34 @@ export class ControlsUI {
     });
   }
 
+  // Unmute the soundtrack at the earliest real browser activation, without
+  // adding a second intro tap or overriding an explicit mute preference.
+  enableDefaultAudio() {
+    if (this.audioOptedOut || this.audioUnlockCleanup) return;
+    const events = ['pointerdown', 'pointerup', 'touchend', 'keydown'];
+    const unlock = event => {
+      if (!event.isTrusted || event.target?.closest?.('#btn-audio')) return;
+      if (event.type === 'pointerdown' && event.pointerType !== 'mouse') return;
+      if (event.type === 'keydown' && (event.repeat || event.ctrlKey || event.altKey || event.metaKey || event.key === 'Escape')) return;
+      if (this.audioOptedOut) { cleanup(); return; }
+      this.audioEngine.start();
+      this.syncToggleStates();
+      if (this.audioEngine.ctx?.state === 'running') cleanup();
+    };
+    const cleanup = () => {
+      for (const type of events) document.removeEventListener(type, unlock, true);
+      this.audioUnlockCleanup = null;
+    };
+    this.audioUnlockCleanup = cleanup;
+    for (const type of events) document.addEventListener(type, unlock, { capture: true, passive: true });
+    // Some browsers allow autoplay for previously engaged origins.
+    if (navigator.getAutoplayPolicy?.('audiocontext') === 'allowed') {
+      this.audioEngine.start();
+      this.syncToggleStates();
+      if (this.audioEngine.ctx?.state === 'running') cleanup();
+    }
+  }
+
   setUiHidden(hidden) {
     this.uiHidden = hidden;
     this.root.classList.toggle('is-hidden', hidden);
@@ -204,6 +240,8 @@ export class ControlsUI {
       this.snowSliderEl.style.opacity = this.envDetails.snowEnabled ? '1' : '0.35';
     }
     this.audioBtn.classList.toggle('is-active', this.audioEngine.isPlaying);
+    this.audioBtn.setAttribute('aria-pressed', String(this.audioEngine.isPlaying));
+    this.audioBtn.setAttribute('aria-label', this.audioEngine.isPlaying ? '关闭背景声音' : '开启背景声音');
     this.fsBtn.classList.toggle('is-active', Boolean(document.fullscreenElement));
   }
 
