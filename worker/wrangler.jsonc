@@ -9,5 +9,11 @@
       "binding": "CARDS_KV",
       "id": "bc1b3fc7bdc44d4d873c4f4dbf405f6e"
     }
+  ],
+  "routes": [
+    {
+      "pattern": "cards.konig.cc.cd",
+      "custom_domain": true
+    }
   ]
 }

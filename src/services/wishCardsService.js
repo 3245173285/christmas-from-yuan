@@ -1,8 +1,68 @@
-import { WISH_CARDS_API_URL } from '../config/cardsApi.js';
+import { WISH_CARDS_API_URL, WISH_CARDS_FALLBACK_API_URL } from '../config/cardsApi.js';
 import { CARD_STYLE_MAP, DEFAULT_SEED_CARDS } from '../data/wishCardsConfig.js';
 
 const LOCAL_STORAGE_KEY = 'christmas_from_yuan_wish_cards_v1';
 const ADMIN_TOKEN_KEY = 'christmas_from_yuan_admin_session_v1';
+
+// Discover a reachable, verified API before sending any card or admin request.
+// Only the health check is retried across hosts. A write whose response is lost
+// must never be replayed automatically, since the Worker generates a new card ID.
+const API_BASES = [...new Set([WISH_CARDS_API_URL, WISH_CARDS_FALLBACK_API_URL]
+  .filter(url => typeof url === 'string' && /^https:\/\//i.test(url.trim()))
+  .map(url => url.trim().replace(/\/+$/, '')))];
+const PRIMARY_TTL_MS = 60_000;
+const FALLBACK_TTL_MS = 12_000;
+let selectedApi = null;
+let selectingApi = null;
+
+async function probeApi(base) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4500);
+  try {
+    const response = await fetch(`${base}/`, {
+      method: 'GET', mode: 'cors', cache: 'no-store', signal: controller.signal, redirect: 'error'
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.ok === true && data.service === 'christmas-from-yuan-cards-api';
+  } catch (_) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function resolveApiBase() {
+  if (selectedApi && selectedApi.expires > Date.now()) return selectedApi.base;
+  if (selectingApi) return selectingApi;
+  selectingApi = (async () => {
+    for (const base of API_BASES) {
+      if (await probeApi(base)) {
+        const ttl = base === API_BASES[0] ? PRIMARY_TTL_MS : FALLBACK_TTL_MS;
+        selectedApi = { base, expires: Date.now() + ttl };
+        return base;
+      }
+    }
+    selectedApi = null;
+    throw new Error('暂时无法连接贺卡服务器，请检查网络后重试');
+  })();
+  try {
+    return await selectingApi;
+  } finally {
+    selectingApi = null;
+  }
+}
+
+async function cloudFetch(path, options) {
+  const base = await resolveApiBase();
+  try {
+    return await fetch(`${base}${path}`, { ...options, redirect: 'error' });
+  } catch (_) {
+    // On the next request, re-check both endpoints rather than caching a failure.
+    selectedApi = null;
+    throw new Error('贺卡服务器连接中断，请刷新确认结果后再重试');
+  }
+}
 
 function sanitizeCard(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -52,7 +112,7 @@ function writeLocalCards(cards) {
 }
 
 export function isCloudBackendEnabled() {
-  return Boolean(WISH_CARDS_API_URL && WISH_CARDS_API_URL.trim().startsWith('http'));
+  return API_BASES.length > 0;
 }
 
 export function getAdminToken() {
@@ -87,8 +147,7 @@ export async function verifyAdminPassword(password) {
     throw new Error('尚未配置云端后端地址');
   }
 
-  const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
-  const res = await fetch(`${base}/api/admin/verify`, {
+  const res = await cloudFetch(`/api/admin/verify`, {
     method: 'POST',
     mode: 'cors',
     headers: {
@@ -110,8 +169,8 @@ export async function fetchWishCards() {
 
   if (isCloudBackendEnabled()) {
     try {
-      const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
-      const res = await fetch(`${base}/api/cards`, { method: 'GET', mode: 'cors' });
+
+      const res = await cloudFetch(`/api/cards`, { method: 'GET', mode: 'cors' });
       if (res.ok) {
         const data = await res.json();
         const remote = (Array.isArray(data.cards) ? data.cards : [])
@@ -147,12 +206,12 @@ export async function submitWishCard(draft) {
   let syncedToCloud = false;
 
   if (isCloudBackendEnabled()) {
-    const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
+
     const headers = { 'Content-Type': 'application/json' };
     const token = getAdminToken();
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    const res = await fetch(`${base}/api/cards`, {
+    const res = await cloudFetch(`/api/cards`, {
       method: 'POST',
       mode: 'cors',
       headers,
@@ -189,8 +248,8 @@ export async function updateWishCard(cardId, updates) {
   }
 
   if (isCloudBackendEnabled()) {
-    const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
-    const res = await fetch(`${base}/api/cards/${encodeURIComponent(cardId)}`, {
+
+    const res = await cloudFetch(`/api/cards/${encodeURIComponent(cardId)}`, {
       method: 'PATCH',
       mode: 'cors',
       headers: {
@@ -236,8 +295,8 @@ export async function deleteWishCard(cardId) {
   }
 
   if (isCloudBackendEnabled()) {
-    const base = WISH_CARDS_API_URL.replace(/\/+$/, '');
-    const res = await fetch(`${base}/api/cards/${encodeURIComponent(cardId)}`, {
+
+    const res = await cloudFetch(`/api/cards/${encodeURIComponent(cardId)}`, {
       method: 'DELETE',
       mode: 'cors',
       headers: {
